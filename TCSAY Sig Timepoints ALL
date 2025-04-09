@@ -1,0 +1,54 @@
+# Initialize a dictionary to store the total number of significant time points for each layer
+total_significant_timepoints = {}
+
+# Iterate over each layer in the cleaned_clusters_dict
+for layer_name, clusters in cleaned_clusters_dict.items():
+    # Initialize a set to keep track of unique significant time points
+    significant_time_points = set()
+
+    # Iterate over each cluster (start, stop) pair
+    for start, stop in clusters:
+        # Add the range of significant time points in the current cluster to the set
+        significant_time_points.update(range(start, stop))
+
+    # Store the total number of unique significant time points for the current layer
+    total_significant_timepoints[layer_name] = len(significant_time_points)
+
+# Print the results
+for layer, count in total_significant_timepoints.items():
+    print(f"{layer}: {count} significant time points")
+
+###################################################
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Group the layers into subsets for separate plots
+layer_groups = {
+    'Group 1': list(total_significant_timepoints.keys())[:29],
+    'Group 2': list(total_significant_timepoints.keys())[29:61],
+    'Group 3': list(total_significant_timepoints.keys())[61:107],
+    'Group 4': list(total_significant_timepoints.keys())[107:]
+}
+
+# Plot each group
+for group_name, layers in layer_groups.items():
+    # Extract the total significant time points for the current group
+    counts = [total_significant_timepoints[layer] for layer in layers if layer in total_significant_timepoints]
+
+    # Plot the data
+    plt.figure(figsize=(10, 6))
+    plt.plot(layers, counts, marker='o', linestyle='-', label='Significant Time Points')
+
+    # Customize the plot
+    plt.xticks(rotation=90)  # Rotate x-axis labels for better visibility
+    plt.xlabel('Layers', fontsize=14)
+    plt.ylabel('Total Significant Time Points', fontsize=14)
+    plt.title(f'Total Significant Time Points ({group_name})', fontsize=16)
+    plt.grid(True, axis='y')  # Add a grid to the y-axis for better visualization
+
+    # Add padding to avoid overlapping of axis and text
+    plt.tight_layout()
+
+    # Show the plot
+    plt.show()
+
