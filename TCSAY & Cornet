@@ -1,0 +1,407 @@
+#Complete code (for one layer: TCSAY & Cornet)
+!pip install datasets
+!pip install torchvision
+!pip install mne
+
+#ALL IMPORTS
+#still need to be properly organized
+import os
+from PIL import Image
+import matplotlib.pyplot as plt
+from google.colab import drive
+from scipy.io import loadmat
+import torch
+import torchvision.models as models
+from torchvision import transforms, datasets, utils
+from PIL import Image
+from torchvision import transforms
+from torchvision import datasets
+from torch.utils.data import DataLoader
+import torch
+import torchvision.models as models
+from torchvision import transforms, datasets
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from torch.utils.data import DataLoader
+from PIL import Image
+from torchvision import transforms
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import sem, spearmanr
+import mne.stats as mstats
+
+#Sucessful upload of images from google drive!! 23.12.21 - start_here##########
+import os
+from PIL import Image
+import matplotlib.pyplot as plt
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+folder_path = '/content/drive/My Drive/Colab Notebooks/original visual stimuli'
+image_files = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith(('.jpg', '.png', '.jpeg'))]
+
+images = [Image.open(file) for file in image_files]
+
+#TEST 3 (WORKS - USE THIS FOR NOW)#############################################
+#Check which layer I should pull data from
+import torch
+import torchvision.models as models
+from torchvision import transforms, datasets
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from torch.utils.data import DataLoader
+
+# Define the model
+model = models.resnext50_32x4d(pretrained=False)
+model.fc = torch.nn.Linear(in_features=2048, out_features=6269, bias=True)
+model = torch.nn.DataParallel(model).cuda()
+
+# Load the model weights from the checkpoint
+checkpoint_path = '/content/drive/My Drive/Colab Notebooks/TC-SAY-resnext.tar'
+checkpoint = torch.load(checkpoint_path,weights_only=False) # added weights_only=False for PyTorch 2.6 requirement
+model.load_state_dict(checkpoint['model_state_dict'])
+
+# Set the model to evaluation mode
+model.eval()
+
+# Image Preprocessing
+preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+# Load the dataset
+image_data_path = "/content/drive/My Drive/Colab Notebooks/original visual stimuli"
+dataset = datasets.ImageFolder(root=image_data_path, transform=preprocess)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=2)
+
+# Extract features from different layers of the model
+def get_feature_vectors(model, dataloader, layer_name):
+    feature_vectors = []
+
+    # Hook function to extract features
+    def hook_fn(module, input, output):
+        feature_vectors.append(output.detach().cpu().numpy())
+
+    # Register the hook
+    layer = dict(model.module.named_modules())[layer_name]
+    handle = layer.register_forward_hook(hook_fn)
+
+    # Pass the data through the model
+    for inputs, labels in dataloader:
+        inputs = inputs.cuda()
+        model(inputs)
+
+    # Remove the hook
+    handle.remove()
+
+    # Concatenate all feature vectors and reshape if necessary
+    feature_vectors = np.concatenate(feature_vectors, axis=0)
+
+    # Flatten the feature vectors if they are more than 2D
+    if feature_vectors.ndim > 2:
+        num_samples = feature_vectors.shape[0]
+        flattened_features = feature_vectors.reshape(num_samples, -1)
+    else:
+        flattened_features = feature_vectors
+
+    return flattened_features
+
+# Extract features from a specific layer, e.g., 'layer4'
+layer_name = 'layer4'
+all_feature_vectors = get_feature_vectors(model, dataloader, layer_name)
+
+# Calculate cosine similarity matrix
+similarity_matrix = cosine_similarity(all_feature_vectors)
+
+# Print the similarity matrix
+print("Cosine similarity matrix:")
+print(similarity_matrix)
+
+TC_SAY_resnext = np.array(1-similarity_matrix)
+
+#Plot RDM with title, axes titles, and colorbar TC_SAY_resnext
+import matplotlib.pyplot as plt
+
+plt.imshow(TC_SAY_resnext)
+plt.colorbar()
+plt.title('Representational Dissimilarity Matrix')
+plt.ylabel('Images', fontsize=16)
+plt.xlabel('Compared Images', fontsize=16)
+
+# turning the 16x16 RDM into a list of 120 values
+#rdm indices is a list of x and y values
+rdm_indices = np.triu_indices(16)
+cor_rdm = []
+for i in range(0,len(rdm_indices[0])):
+#pulls out x and y values, (index at 0)
+    x = rdm_indices[0][i]
+    y = rdm_indices[1][i]
+#skipping diagnol
+    if x==y:
+        continue
+ #appending values selected at x and y to RDM List
+    cor_rdm.append(TC_SAY_resnext[x,y])
+print(cor_rdm)
+len(cor_rdm)
+
+DataPath = '/content/drive/My Drive/Colab Notebooks/'
+fname='Results_diss_babies_pooled_decode_within_SVM_02.28.2024_16.29.56.mat'
+data = loadmat(DataPath+fname)['results'][0,0]
+DA = data['DA']
+times=data['times']
+epoch=len(times[0])
+np.shape(DA)
+
+#generating a 120 value list for an RDM for each participant and time point
+time_start = 0
+time_end = epoch
+accMeans = []
+#for each partic. for each time point, you are taking each value of 16'16 matrix (upper triangle) to generate a 120 len list)
+for part in range(0,np.shape(DA)[0]):
+#     if part+1 in subs_remove:
+#         continue
+    accTimesD = []
+    for point in range(time_start,time_end):
+        rdm_neural=[]
+#selecting pairs of coordinates of upper triangle to get values we want
+        for i in range(0,136):
+            r = rdm_indices[0][i]
+            c = rdm_indices[1][i]
+            #skipping diagnol
+            if r==c:
+                continue
+            rdm_neural.append(DA[part,point,r,c])
+        #adding rdm to list all time points for one partic.
+        accTimesD.append(rdm_neural)
+    #adding partic level list to list of all partic data, (leaving u with 34, 550,120)
+    accMeans.append(accTimesD)
+#reshaping to make it the correct order
+bb = np.shape(DA)[0]
+#bb = 5
+accMeans=np.array(accMeans).reshape(bb,epoch,120)
+np.shape(accMeans)
+
+#giving us the list of correlations, the behavioral rdm and neural rdm at each timepoint
+rvalues = []
+for partic in accMeans:
+    participant = []
+    for timepoint in partic:
+        #getting each r and p value for all the correlations
+        rho, p = spearmanr(timepoint, cor_rdm)
+        participant.append(rho)
+        #adding each indiv. partic correlation to a big list with all partic.
+    rvalues.append(participant)
+np.shape(rvalues)
+
+#making a list of zeros to compare R values to
+b=np.full([np.shape(DA)[0],epoch],0)
+#running the permutation cluster test
+T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.array(rvalues),b], tail=1, out_type="mask")
+
+#creating list of overall average of r values for all participants
+avg_r = np.mean(rvalues,0)
+np.shape(rvalues)
+
+#Plotting all the correlations
+#times=range(0,epoch)
+#plt.figure(figsize=(20,10))
+#for i in range(0,bb):
+#    plt.plot(range(time_start-100,time_end-100),rvalues[i],color="teal")
+#plt.plot(range(time_start-100,time_end-100),avg_r, linewidth=5,color="purple", label="")
+#plt.subplot
+#for i_c, c in enumerate(clusters):
+#    c = c[0]
+#    if cluster_p_values[i_c] <= 0.05:
+#        h = plt.axvspan(times[c.start]-100, times[c.stop - 1]-100,
+#                         color='pink', alpha=0.5,ymin=0.10,ymax=0.12)
+#plt.ylabel('Spearman r',fontsize=30)
+#plt.xlabel('Time (ms)',fontsize=30)
+#plt.xticks(fontsize=20)
+#plt.yticks(fontsize=20)
+#plt.hlines(0, -100, 1000)
+#plt.xlim(-100,1000)
+#plt.show()
+#############################################################
+# Compute standard error of the mean (SEM) for 95% CI
+sem_r = sem(rvalues, axis=0)
+ci_upper = avg_r + 1.96 * sem_r  # Upper bound
+ci_lower = avg_r - 1.96 * sem_r  # Lower bound
+
+# Plotting all correlations
+times = range(0, epoch)
+plt.figure(figsize=(20, 10))
+
+# Plot individual participant correlations
+for i in range(0,bb):
+    plt.plot(range(time_start-100, time_end-100), rvalues[i], color="teal", alpha=0.6)
+
+# Plot average correlation with 95% CI shading
+plt.plot(range(time_start-100, time_end-100), avg_r, linewidth=5, color="purple", label="Average Correlation")
+plt.fill_between(range(time_start-100, time_end-100), ci_lower, ci_upper, color="purple", alpha=0.2, label="95% CI")
+
+# Highlight significant clusters
+plt.subplot
+for i_c, c in enumerate(clusters):
+    c = c[0]
+    if cluster_p_values[i_c] <= 0.05:
+        plt.axvspan(times[c.start]-100, times[c.stop - 1]-100, color='pink', alpha=0.5, ymin=0.10, ymax=0.12)
+
+# Formatting
+plt.ylabel('Spearman r', fontsize=30)
+plt.xlabel('Time (ms)', fontsize=30)
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+plt.hlines(0, -100, 1000, color='black', linestyle='dashed')
+plt.xlim(-100, 1000)
+plt.legend(fontsize=20)
+plt.show()
+
+#############################################################
+# Initialize the dictionary if it doesn't exist
+saved_avg_r_data = {
+    "time": list(range(time_start - 100, time_end - 100))  # Ensure time remains consistent
+}
+
+# Add first set of results (e.g., Condition 1)
+saved_avg_r_data["avg_r_condition_TCSAY"] = avg_r
+saved_avg_r_data["ci_lower_condition_TCSAY"] = ci_lower
+saved_avg_r_data["ci_upper_condition_TCSAY"] = ci_upper
+# Extract significant cluster time ranges and store them in saved_avg_r_data
+saved_avg_r_data["significant_clusters_TCSAY"] = [
+    (times[c[0].start] - 100, times[c[0].stop - 1] - 100)  # Extract start and stop times
+    for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
+] # Store significant clusters
+saved_avg_r_data["cluster_p_values_TCSAY"] = cluster_p_values  # Store corresponding p-values
+
+#############################################################
+
+filename = '/content/drive/My Drive/Colab Notebooks/CORnet-S_IT_output_feats (1).npy'
+dataset_cor = np.load(filename, encoding='bytes')
+
+#Creating RDM for Cornet model
+# Get feature vectors for the entire dataset
+all_feature_vectors = dataset_cor
+# Calculate cosine similarity matrix
+similarity_matrix = cosine_similarity(all_feature_vectors)
+# Print or use the similarity matrix as needed
+cornet = np.array(1-similarity_matrix)
+
+# turning the 16x16 RDM into a list of 120 values
+#rdm indices is a list of x and y values
+rdm_indices = np.triu_indices(16)
+cor_rdm = []
+for i in range(0,len(rdm_indices[0])):
+#pulls out x and y values, (index at 0)
+    x = rdm_indices[0][i]
+    y = rdm_indices[1][i]
+#skipping diagnol
+    if x==y:
+        continue
+ #appending values selected at x and y to RDM List
+    cor_rdm.append(cornet[x,y])
+print(cor_rdm)
+len(cor_rdm)
+
+#Plot RDM with title, axes titles, and colorbar for cornet
+import matplotlib.pyplot as plt
+
+plt.imshow(cornet)
+plt.colorbar()
+plt.title('Representational Dissimilarity Matrix')
+plt.ylabel('Images', fontsize=16)
+plt.xlabel('Compared Images', fontsize=16)
+
+#TEST (SKIP)
+#Running Spearman correlation between Cornet and infant data
+
+#giving us the list of correlations, the behavioral rdm and neural rdm at each timepoint
+rvalues = []
+for partic in accMeans:
+    participant = []
+    for timepoint in partic:
+        #getting each r and p value for all the correlations
+        rho, p = spearmanr(timepoint, cor_rdm)
+        participant.append(rho)
+        #adding each indiv. partic correlation to a big list with all partic.
+    rvalues.append(participant)
+np.shape(rvalues)
+
+#making a list of zeros to compare R values to
+b=np.full([np.shape(DA)[0],epoch],0)
+#running the permutation cluster test
+T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.array(rvalues),b], tail=1, out_type="mask")
+
+#creating list of overall average of r values for all partipants
+avg_r = np.mean(rvalues,0)
+np.shape(rvalues)
+
+#Plotting all the correlations
+#times=range(0,epoch)
+#plt.figure(figsize=(20,10))
+#for i in range(0,bb):
+#    plt.plot(range(time_start-100,time_end-100),rvalues[i],color="teal")
+#plt.plot(range(time_start-100,time_end-100),avg_r, linewidth=5,color="purple", label="")
+#plt.subplot()
+#for i_c, c in enumerate(clusters):
+#    c = c[0]
+#    if cluster_p_values[i_c] <= 0.05:
+#        h = plt.axvspan(times[c.start]-100, times[c.stop - 1]-100,
+#                         color='pink', alpha=0.5,ymin=0.10,ymax=0.12)
+#plt.ylabel('Spearman r',fontsize=30)
+#plt.xlabel('Time (ms)',fontsize=30)
+#plt.xticks(fontsize=20)
+#plt.yticks(fontsize=20)
+#plt.hlines(0, -100, 1000)
+#plt.xlim(-100,1000)
+#plt.show()
+#################################################
+# Compute standard error of the mean (SEM) for 95% CI
+sem_r = sem(rvalues, axis=0)
+ci_upper = avg_r + 1.96 * sem_r  # Upper bound
+ci_lower = avg_r - 1.96 * sem_r  # Lower bound
+
+# Plotting all correlations
+times = range(0, epoch)
+plt.figure(figsize=(20, 10))
+
+# Plot individual participant correlations
+for i in range(0,bb):
+    plt.plot(range(time_start-100, time_end-100), rvalues[i], color="teal", alpha=0.6)
+
+# Plot average correlation with 95% CI shading
+plt.plot(range(time_start-100, time_end-100), avg_r, linewidth=5, color="purple", label="Average Correlation")
+plt.fill_between(range(time_start-100, time_end-100), ci_lower, ci_upper, color="purple", alpha=0.2, label="95% CI")
+
+# Highlight significant clusters
+plt.subplot
+for i_c, c in enumerate(clusters):
+    c = c[0]
+    if cluster_p_values[i_c] <= 0.05:
+        plt.axvspan(times[c.start]-100, times[c.stop - 1]-100, color='pink', alpha=0.5, ymin=0.10, ymax=0.12)
+
+# Formatting
+plt.ylabel('Spearman r', fontsize=30)
+plt.xlabel('Time (ms)', fontsize=30)
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+plt.hlines(0, -100, 1000, color='black', linestyle='dashed')
+plt.xlim(-100, 1000)
+plt.legend(fontsize=20)
+plt.show()
+
+#################################################
+# Add first set of results (e.g., Condition 1)
+saved_avg_r_data["avg_r_condition_cornet"] = avg_r
+saved_avg_r_data["ci_lower_condition_cornet"] = ci_lower
+saved_avg_r_data["ci_upper_condition_cornet"] = ci_upper
+# Extract significant cluster time ranges and store them in saved_avg_r_data
+saved_avg_r_data["significant_clusters_cornet"] = [
+    (times[c[0].start] - 100, times[c[0].stop - 1] - 100)  # Extract start and stop times
+    for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
+] # Store significant clusters
+saved_avg_r_data["cluster_p_values_cornet"] = cluster_p_values  # Store corresponding p-values
