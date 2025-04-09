@@ -1,0 +1,59 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Step 1: Compute average r-values across 15 channels for each layer
+avg_rvalues_dict = {}  # Dictionary to store averaged r-values for each layer
+
+for layer, rvalues in rvalues_dict.items():
+    rvalues_array = np.array(rvalues)  # Convert list to NumPy array (Shape: 15 x 1100)
+    avg_r = np.mean(rvalues_array, axis=0)  # Compute mean across 15 channels
+    avg_rvalues_dict[layer] = avg_r  # Store in dictionary
+
+# Print first few average r-values for each layer
+for layer in avg_rvalues_dict:
+    print(f"Layer: {layer}, Avg r-values (first 5 time points): {avg_rvalues_dict[layer][:5]}")
+
+# Step 2: Find the peak r-value and corresponding time point for each layer
+peak_rvalues = {}
+peak_timepoints = {}
+
+for layer, avg_r in avg_rvalues_dict.items():
+    peak_idx = np.argmax(avg_r)  # Find index of max r-value (1D array)
+    peak_rvalue = avg_r[peak_idx]  # Get the max r-value
+    peak_rvalues[layer] = peak_rvalue
+    peak_timepoints[layer] = peak_idx  # Time index
+
+# Print peak r-values with timepoints
+for layer in peak_rvalues:
+    print(f"Layer: {layer}, Peak r-value: {peak_rvalues[layer]:.4f}, Time point: {peak_timepoints[layer]}")
+
+###################################################
+# Step 3: Group layers into subsets for separate plots (same as significant time points plot)
+layer_groups = {
+    'Group 1': list(peak_rvalues.keys())[:29],
+    'Group 2': list(peak_rvalues.keys())[29:61],
+    'Group 3': list(peak_rvalues.keys())[61:107],
+    'Group 4': list(peak_rvalues.keys())[107:]
+}
+
+# Step 4: Plot each group, where the x-axis is the layer and the y-axis is the peak timepoint
+for group_name, layers in layer_groups.items():
+    # Extract the peak time points for the current group
+    timepoints = [peak_timepoints[layer] for layer in layers if layer in peak_timepoints]
+
+    # Plot the data
+    plt.figure(figsize=(10, 6))
+    plt.plot(layers, timepoints, marker='o', linestyle='-', color='steelblue', label='Peak Timepoints')
+
+    # Customize the plot
+    plt.xticks(rotation=90)  # Rotate x-axis labels for better visibility
+    plt.xlabel('Layers', fontsize=14)
+    plt.ylabel('Peak Time Point', fontsize=14)
+    plt.title(f'Peak Time Points Across Layers ({group_name})', fontsize=16)
+    plt.grid(True, axis='y')  # Add a grid to the y-axis for better visualization
+
+    # Add padding to avoid overlapping of axis and text
+    plt.tight_layout()
+
+    # Show the plot
+    plt.show()
