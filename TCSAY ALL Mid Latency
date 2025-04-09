@@ -1,6 +1,8 @@
+#Update Legend
 # Import necessary libraries
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.lines import Line2D  # Import for custom legend
 
 # Comprehensive list of layers to test
 layers_to_test = [
@@ -34,6 +36,13 @@ layer_groups = {
 
 # Define the time range for the x-axis
 times = range(-100, 1000)
+
+# Define custom legend handles for significance levels
+legend_handles = [
+    Line2D([0], [0], color='red', lw=2, label='p ≤ 0.05'),
+    Line2D([0], [0], color='blue', lw=2, label='p ≤ 0.01'),
+    Line2D([0], [0], color='green', lw=2, label='p ≤ 0.001')
+]
 
 # Create a figure for each group of layers
 for group_name, layers in layer_groups.items():
@@ -79,7 +88,13 @@ for group_name, layers in layer_groups.items():
 
     plt.yticks(y_positions, layers)  # Set y-ticks to layer names
     plt.grid(True, axis='x')  # Add grid for better visualization
-    plt.legend()  # Add legend for the shaded region
+
+    # Add both legends (Significance Levels + Mid Latency)
+    plt.legend(handles=legend_handles + [Line2D([0], [0], color='gray', lw=6, alpha=0.2, label='Mid Latency')],
+               title="Legend", loc="upper right")
+
+    plt.tight_layout()  # Adjust layout
+    plt.show()  # Display the plot
     plt.tight_layout()  # Adjust layout
 
     # Show the plot
