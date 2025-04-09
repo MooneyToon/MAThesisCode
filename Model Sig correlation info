@@ -1,0 +1,48 @@
+# Extract significant time bands from pink bars
+significant_time_bands = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+        significant_time_bands.append((start_time, stop_time))
+
+# Print the extracted time bands
+print("Significant Time Bands (ms):")
+for band in significant_time_bands:
+    print(f"Start: {band[0]} ms, Stop: {band[1]} ms")
+
+##################################################
+# Extract significant time bands, peak r-values, and p-values
+significant_clusters_info = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+
+        # Get r-values for this time window
+        r_values_in_cluster = avg_r[c.start:c.stop]
+
+        # Find the peak r-value and its corresponding time
+        peak_r_value = np.max(r_values_in_cluster)  # Highest correlation value
+        peak_r_time = times[np.argmax(r_values_in_cluster) + c.start] - 100  # Convert to correct time
+
+        # Store cluster info
+        significant_clusters_info.append({
+            "start_time": start_time,
+            "stop_time": stop_time,
+            "peak_r_value": peak_r_value,
+            "peak_r_time": peak_r_time,
+            "p_value": cluster_p_values[i_c]
+        })
+
+# Print extracted cluster information
+print("Significant Clusters Information:")
+for cluster in significant_clusters_info:
+    print(f"Time Band: {cluster['start_time']} ms to {cluster['stop_time']} ms")
+    print(f"  - Peak r-value: {cluster['peak_r_value']} at {cluster['peak_r_time']} ms")
+    print(f"  - Cluster p-value: {cluster['p_value']}")
+    print("-" * 50)
