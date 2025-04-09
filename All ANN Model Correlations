@@ -1,0 +1,64 @@
+# Final Plot
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Extract time vector
+time = saved_avg_r_data["time"]
+
+# Define color and cluster info
+cluster_info = {
+    "cornet":       {"color": "red",     "ymin": 0.03, "ymax": 0.06},
+    "TCSAY":        {"color": "orange",  "ymin": 0.07, "ymax": 0.1},
+    "CVCL":         {"color": "green",   "ymin": 0.11, "ymax": 0.14},
+    "VoneCornetS":  {"color": "blue",    "ymin": 0.15, "ymax": 0.18},
+    "VOneResnet50": {"color": "purple",  "ymin": 0.19, "ymax": 0.22}
+}
+
+# Create figure and axis (single plot for both)
+fig, ax1 = plt.subplots(figsize=(20, 12))
+
+# --- Plot 1: Average Correlation with CI ---
+for condition, info in cluster_info.items():
+    color = info["color"]
+    ax1.plot(time, saved_avg_r_data[f"avg_r_condition_{condition}"],
+             linewidth=5, color=color, label=f"Avg Correlation {condition.upper()}")
+
+    ax1.fill_between(time,
+                     saved_avg_r_data[f"ci_lower_condition_{condition}"],
+                     saved_avg_r_data[f"ci_upper_condition_{condition}"],
+                     color=color, alpha=0.1)
+
+# --- Plot 2: Significance Bars ---
+for condition, info in cluster_info.items():
+    clusters = saved_avg_r_data.get(f"significant_clusters_{condition}", [])
+    color = info["color"]
+    ymin = info["ymin"]
+    ymax = info["ymax"]
+
+    # Convert to array in case it's a list
+    clusters_array = np.array(clusters)
+
+    for cluster in clusters_array:
+        start_idx, stop_idx = cluster
+        start_time = time[start_idx] + 100  # Shift by 100 ms
+        stop_time = time[stop_idx] + 100    # Shift by 100 ms
+
+        # Plot significance bars as a subplot within plot 1
+        ax1.axvspan(start_time, stop_time,
+                    color=color,
+                    alpha=0.5,
+                    ymin=ymin, ymax=ymax)
+
+# Formatting the plot
+ax1.set_ylabel('Spearman r', fontsize=30)
+ax1.set_xlabel("Time (ms)", fontsize=30)
+ax1.set_xlim(-100, 1000)
+ax1.axhline(0, color='black', linestyle='dashed')
+ax1.legend(fontsize=12)
+ax1.set_title("Average Correlation with 95% CI and Significant Clusters", fontsize=25)
+ax1.tick_params(axis='both', labelsize=20)
+
+plt.tight_layout()
+plt.show()
+
