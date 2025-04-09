@@ -1,0 +1,86 @@
+# Import necessary libraries
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Comprehensive list of layers to test
+layers_to_test = [
+    'conv1', 'bn1', 'relu', 'maxpool',
+    'layer1', 'layer1.0', 'layer1.0.conv1', 'layer1.0.bn1', 'layer1.0.conv2', 'layer1.0.bn2', 'layer1.0.conv3', 'layer1.0.bn3', 'layer1.0.relu', 'layer1.0.downsample', 'layer1.0.downsample.0', 'layer1.0.downsample.1',
+    'layer1.1', 'layer1.1.conv1', 'layer1.1.bn1', 'layer1.1.conv2', 'layer1.1.bn2', 'layer1.1.conv3', 'layer1.1.bn3', 'layer1.1.relu',
+    'layer1.2', 'layer1.2.conv1', 'layer1.2.bn1', 'layer1.2.conv2', 'layer1.2.bn2', 'layer1.2.conv3', 'layer1.2.bn3', 'layer1.2.relu',
+    'layer2', 'layer2.0', 'layer2.0.conv1', 'layer2.0.bn1', 'layer2.0.conv2', 'layer2.0.bn2', 'layer2.0.conv3', 'layer2.0.bn3', 'layer2.0.relu', 'layer2.0.downsample', 'layer2.0.downsample.0', 'layer2.0.downsample.1',
+    'layer2.1', 'layer2.1.conv1', 'layer2.1.bn1', 'layer2.1.conv2', 'layer2.1.bn2', 'layer2.1.conv3', 'layer2.1.bn3', 'layer2.1.relu',
+    'layer2.2', 'layer2.2.conv1', 'layer2.2.bn1', 'layer2.2.conv2', 'layer2.2.bn2', 'layer2.2.conv3', 'layer2.2.bn3', 'layer2.2.relu',
+    'layer2.3', 'layer2.3.conv1', 'layer2.3.bn1', 'layer2.3.conv2', 'layer2.3.bn2', 'layer2.3.conv3', 'layer2.3.bn3', 'layer2.3.relu',
+    'layer3', 'layer3.0', 'layer3.0.conv1', 'layer3.0.bn1', 'layer3.0.conv2', 'layer3.0.bn2', 'layer3.0.conv3', 'layer3.0.bn3', 'layer3.0.relu', 'layer3.0.downsample', 'layer3.0.downsample.0', 'layer3.0.downsample.1',
+    'layer3.1', 'layer3.1.conv1', 'layer3.1.bn1', 'layer3.1.conv2', 'layer3.1.bn2', 'layer3.1.conv3', 'layer3.1.bn3', 'layer3.1.relu',
+    'layer3.2', 'layer3.2.conv1', 'layer3.2.bn1', 'layer3.2.conv2', 'layer3.2.bn2', 'layer3.2.conv3', 'layer3.2.bn3', 'layer3.2.relu',
+    'layer3.3', 'layer3.3.conv1', 'layer3.3.bn1', 'layer3.3.conv2', 'layer3.3.bn2', 'layer3.3.conv3', 'layer3.3.bn3', 'layer3.3.relu',
+    'layer3.4', 'layer3.4.conv1', 'layer3.4.bn1', 'layer3.4.conv2', 'layer3.4.bn2', 'layer3.4.conv3', 'layer3.4.bn3', 'layer3.4.relu',
+    'layer3.5', 'layer3.5.conv1', 'layer3.5.bn1', 'layer3.5.conv2', 'layer3.5.bn2', 'layer3.5.conv3', 'layer3.5.bn3', 'layer3.5.relu',
+    'layer4', 'layer4.0', 'layer4.0.conv1', 'layer4.0.bn1', 'layer4.0.conv2', 'layer4.0.bn2', 'layer4.0.conv3', 'layer4.0.bn3', 'layer4.0.relu', 'layer4.0.downsample', 'layer4.0.downsample.0', 'layer4.0.downsample.1',
+    'layer4.1', 'layer4.1.conv1', 'layer4.1.bn1', 'layer4.1.conv2', 'layer4.1.bn2', 'layer4.1.conv3', 'layer4.1.bn3', 'layer4.1.relu',
+    'layer4.2', 'layer4.2.conv1', 'layer4.2.bn1', 'layer4.2.conv2', 'layer4.2.bn2', 'layer4.2.conv3', 'layer4.2.bn3', 'layer4.2.relu',
+    'avgpool', 'fc'
+]
+
+# Group the layers into subsets for separate plots
+layer_groups = {
+    'Group 1': layers_to_test[:32],
+    'Group 2': layers_to_test[32:68],
+    'Group 3': layers_to_test[68:120],
+    'Group 4': layers_to_test[120:]
+}
+
+# Define the time range for the x-axis
+times = range(-100, 1000)
+
+# Create a figure for each group of layers
+for group_name, layers in layer_groups.items():
+    # Create a new figure for the group
+    plt.figure(figsize=(20, 10))
+
+    # Add shaded background for the specified range
+    plt.axvspan(200, 490, color='gray', alpha=0.2, label='Mid Latency')
+
+    # Y-axis positions for each layer in the group
+    y_positions = np.arange(len(layers))
+
+    # Iterate through each layer in the current group
+    for i, layer_name in enumerate(layers):
+        if layer_name not in cleaned_clusters_dict:
+            continue  # Skip layers that do not exist in the dictionary
+
+        # Iterate through each cluster for the current layer
+        for i_c, (start, stop) in enumerate(cleaned_clusters_dict[layer_name]):
+            p_value = cluster_p_values_dict[layer_name][i_c]
+
+            # Assign color based on p-value thresholds
+            if p_value <= 0.001:
+                color = 'green'
+            elif p_value <= 0.01:
+                color = 'blue'
+            elif p_value <= 0.05:
+                color = 'red'
+            else:
+                continue  # Skip if p_value > 0.05 (not significant)
+
+            # Plot the vertical lines for the significant cluster
+            plt.vlines(x=times[start:stop], ymin=i - 0.4, ymax=i + 0.4,
+                       color=color, alpha=0.5)
+
+    # Set the x-axis range for time points
+    plt.xlim(-100, 1000)
+
+    # Customize the plot
+    plt.ylabel('Layers', fontsize=20)
+    plt.xlabel('Time (ms)', fontsize=20)
+    plt.title(f'Significant Clusters Across Layers ({group_name})', fontsize=25)
+
+    plt.yticks(y_positions, layers)  # Set y-ticks to layer names
+    plt.grid(True, axis='x')  # Add grid for better visualization
+    plt.legend()  # Add legend for the shaded region
+    plt.tight_layout()  # Adjust layout
+
+    # Show the plot
+    plt.show()
