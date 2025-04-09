@@ -1,0 +1,382 @@
+# Only load VoneCornet-S
+
+#Setup with VoneNet architecture - seems to be successful
+
+#!pip install git+https://github.com/openai/CLIP.git@main
+#!git clone https://github.com/dicarlolab/vonenet.git
+#%cd vonenet
+
+!pip install git+https://github.com/dicarlolab/vonenet
+
+import vonenet
+
+
+from collections import OrderedDict
+from torch import nn
+from vonenet.modules import VOneBlock
+from vonenet.back_ends import ResNetBackEnd, Bottleneck, AlexNetBackEnd, CORnetSBackEnd
+from vonenet.params import generate_gabor_param
+import numpy as np
+import torchvision
+import torch
+
+##########################################################
+#Mount and Load the Checkpoint
+
+from google.colab import drive
+import shutil
+import torch
+
+# Mount Google Drive
+drive.mount('/content/drive')
+
+# Define paths
+source_path = '/content/drive/My Drive/Colab Notebooks/vonecornets_e70.pth.tar'
+destination_path = '/content/vonecornets_e70.pth.tar'
+
+# Copy the file from Google Drive to the current working directory
+shutil.copy(source_path, destination_path)
+print(f"File copied to working directory: {destination_path}")
+
+# Load the file using PyTorch
+checkpoint = torch.load(destination_path)
+print("File loaded successfully with PyTorch!")
+
+#################################################################
+def VOneNet(sf_corr=0.75, sf_max=9, sf_min=0, rand_param=False, gabor_seed=0,
+            simple_channels=256, complex_channels=256,
+            noise_mode='neuronal', noise_scale=0.35, noise_level=0.07, k_exc=25,
+            model_arch='cornets', image_size=224, visual_degrees=8, ksize=25, stride=4):
+
+
+    out_channels = simple_channels + complex_channels
+
+    sf, theta, phase, nx, ny = generate_gabor_param(out_channels, gabor_seed, rand_param, sf_corr, sf_max, sf_min)
+
+    gabor_params = {'simple_channels': simple_channels, 'complex_channels': complex_channels, 'rand_param': rand_param,
+                    'gabor_seed': gabor_seed, 'sf_max': sf_max, 'sf_corr': sf_corr, 'sf': sf.copy(),
+                    'theta': theta.copy(), 'phase': phase.copy(), 'nx': nx.copy(), 'ny': ny.copy()}
+    arch_params = {'k_exc': k_exc, 'arch': model_arch, 'ksize': ksize, 'stride': stride}
+
+
+    # Conversions
+    ppd = image_size / visual_degrees
+
+    sf = sf / ppd
+    sigx = nx / sf
+    sigy = ny / sf
+    theta = theta/180 * np.pi
+    phase = phase / 180 * np.pi
+
+    vone_block = VOneBlock(sf=sf, theta=theta, sigx=sigx, sigy=sigy, phase=phase,
+                           k_exc=k_exc, noise_mode=noise_mode, noise_scale=noise_scale, noise_level=noise_level,
+                           simple_channels=simple_channels, complex_channels=complex_channels,
+                           ksize=ksize, stride=stride, input_size=image_size)
+
+    if model_arch:
+        bottleneck = nn.Conv2d(out_channels, 64, kernel_size=1, stride=1, bias=False)
+        nn.init.kaiming_normal_(bottleneck.weight, mode='fan_out', nonlinearity='relu')
+
+        if model_arch.lower() == 'resnet50':
+            print('Model: ', 'VOneResnet50')
+            model_back_end = ResNetBackEnd(block=Bottleneck, layers=[3, 4, 6, 3])
+        elif model_arch.lower() == 'alexnet':
+            print('Model: ', 'VOneAlexNet')
+            model_back_end = AlexNetBackEnd()
+        elif model_arch.lower() == 'cornets':
+            print('Model: ', 'VOneCORnet-S')
+            model_back_end = CORnetSBackEnd()
+
+        model = nn.Sequential(OrderedDict([
+            ('vone_block', vone_block),
+            ('bottleneck', bottleneck),
+            ('model', model_back_end),
+        ]))
+    else:
+        print('Model: ', 'VOneNet')
+        model = vone_block
+
+    model.image_size = image_size
+    model.visual_degrees = visual_degrees
+    model.gabor_params = gabor_params
+    model.arch_params = arch_params
+
+    return model
+
+#############################################
+
+# Load model
+model = VOneNet()
+
+# Load Checkpoint
+checkpoint = torch.load(destination_path)
+state_dict = checkpoint['state_dict'] if 'state_dict' in checkpoint else checkpoint
+model.load_state_dict(state_dict, strict=False)
+
+# Set Device and Prepare for Inference
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = model.to(device)
+model.eval()
+
+print("Model loaded and ready for inference!")
+
+########################################################
+#Sucessful upload of images from google drive!! 23.12.21 - start_here##########
+import os
+from PIL import Image
+import matplotlib.pyplot as plt
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+folder_path = '/content/drive/My Drive/Colab Notebooks/original visual stimuli'
+image_files = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith(('.jpg', '.png', '.jpeg'))]
+
+images = [Image.open(file) for file in image_files]
+
+# Image Preprocessing
+preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+])
+
+# Load the dataset
+image_data_path = "/content/drive/My Drive/Colab Notebooks/original visual stimuli"
+dataset = datasets.ImageFolder(root=image_data_path, transform=preprocess)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=2)
+
+#######################################
+# Extract features from different layers of the model
+def get_feature_vectors(model, dataloader, layer_name):
+    feature_vectors = []
+
+    # Hook function to extract features
+    def hook_fn(module, input, output):
+        feature_vectors.append(output.detach().cpu().numpy())
+
+    # Register the hook
+    layer = dict(model.named_modules())[layer_name]
+    handle = layer.register_forward_hook(hook_fn)
+
+    # Pass the data through the model
+    for inputs, labels in dataloader:
+        inputs = inputs.to(device)  # Move inputs to the same device as the model
+        model(inputs)
+
+    # Remove the hook
+    handle.remove()
+
+    # Concatenate all feature vectors and reshape if necessary
+    feature_vectors = np.concatenate(feature_vectors, axis=0)
+
+    # Flatten the feature vectors if they are more than 2D
+    if feature_vectors.ndim > 2:
+        num_samples = feature_vectors.shape[0]
+        flattened_features = feature_vectors.reshape(num_samples, -1)
+    else:
+        flattened_features = feature_vectors
+
+    return flattened_features
+
+
+# Extract features from a specific layer
+layer_name = 'model.IT'
+all_feature_vectors = get_feature_vectors(model, dataloader, layer_name)
+
+print("All feature vectors:")
+print(all_feature_vectors)
+
+# Calculate cosine similarity matrix
+#similarity_matrix = cosine_similarity(all_feature_vectors)
+
+# Print the similarity matrix
+#print("Cosine similarity matrix:")
+#print(similarity_matrix)
+
+#V1Net = np.array(1-similarity_matrix)
+###################################################
+#Correction for non determinism
+
+num_trials = 1000
+similarity_matrices_all_runs = []
+
+for trial in range(num_trials):
+    # Get feature vectors from the model (assuming 'get_feature_vectors' provides this)
+    feature_vectors = get_feature_vectors(model, dataloader, 'model.IT')
+
+    # Calculate cosine similarity matrix
+    similarity_matrix = cosine_similarity(feature_vectors)
+
+    # Store the similarity matrix for this trial
+    similarity_matrices_all_runs.append(similarity_matrix)
+
+# Convert list of similarity matrices into a NumPy array
+similarity_matrices_all_runs = np.array(similarity_matrices_all_runs)
+
+# Compute the average similarity matrix over trials
+avg_similarity_matrix = np.mean(similarity_matrices_all_runs, axis=0)
+
+# Convert similarity matrix to 1 - similarity matrix (V1Net)
+V1Net_avg = np.array(1 - avg_similarity_matrix)
+
+# Print results
+print("Cosine similarity matrix (averaged over trials):")
+print(avg_similarity_matrix)
+
+print("V1Net (1 - average similarity matrix):")
+print(V1Net_avg)
+
+VoneCornetS = V1Net_avg
+###################################################
+
+#Plot RDM with title, axes titles, and colorbar TC_SAY_resnext
+import matplotlib.pyplot as plt
+
+plt.imshow(VoneCornetS)
+plt.colorbar()
+plt.title('Representational Dissimilarity Matrix')
+plt.ylabel('Images', fontsize=16)
+plt.xlabel('Compared Images', fontsize=16)
+
+#########################################################################
+# turning the 16x16 RDM into a list of 120 values
+#rdm indices is a list of x and y values
+rdm_indices = np.triu_indices(16)
+cor_rdm = []
+for i in range(0,len(rdm_indices[0])):
+#pulls out x and y values, (index at 0)
+    x = rdm_indices[0][i]
+    y = rdm_indices[1][i]
+#skipping diagnol
+    if x==y:
+        continue
+ #appending values selected at x and y to RDM List
+    cor_rdm.append(VoneCornetS[x,y])
+print(cor_rdm)
+len(cor_rdm)
+
+DataPath = '/content/drive/My Drive/Colab Notebooks/'
+fname='Results_diss_babies_pooled_decode_within_SVM_02.28.2024_16.29.56.mat'
+data = loadmat(DataPath+fname)['results'][0,0]
+DA = data['DA']
+times=data['times']
+epoch=len(times[0])
+np.shape(DA)
+
+#generating a 120 value list for an RDM for each participant and time point
+time_start = 0
+time_end = epoch
+accMeans = []
+#for each partic. for each time point, you are taking each value of 16'16 matrix (upper triangle) to generate a 120 len list)
+for part in range(0,np.shape(DA)[0]):
+#     if part+1 in subs_remove:
+#         continue
+    accTimesD = []
+    for point in range(time_start,time_end):
+        rdm_neural=[]
+#selecting pairs of coordinates of upper triangle to get values we want
+        for i in range(0,136):
+            r = rdm_indices[0][i]
+            c = rdm_indices[1][i]
+            #skipping diagnol
+            if r==c:
+                continue
+            rdm_neural.append(DA[part,point,r,c])
+        #adding rdm to list all time points for one partic.
+        accTimesD.append(rdm_neural)
+    #adding partic level list to list of all partic data, (leaving u with 34, 550,120)
+    accMeans.append(accTimesD)
+#reshaping to make it the correct order
+bb = np.shape(DA)[0]
+#bb = 5
+accMeans=np.array(accMeans).reshape(bb,epoch,120)
+np.shape(accMeans)
+
+#giving us the list of correlations, the behavioral rdm and neural rdm at each timepoint
+rvalues = []
+for partic in accMeans:
+    participant = []
+    for timepoint in partic:
+        #getting each r and p value for all the correlations
+        rho, p = spearmanr(timepoint, cor_rdm)
+        participant.append(rho)
+        #adding each indiv. partic correlation to a big list with all partic.
+    rvalues.append(participant)
+np.shape(rvalues)
+
+#making a list of zeros to compare R values to
+b=np.full([np.shape(DA)[0],epoch],0)
+#running the permutation cluster test
+T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.array(rvalues),b], tail=1, out_type="mask")
+
+#creating list of overall average of r values for all participants
+avg_r = np.mean(rvalues,0)
+np.shape(rvalues)
+
+#Plotting all the correlations
+#times=range(0,epoch)
+#plt.figure(figsize=(20,10))
+#for i in range(0,bb):
+#    plt.plot(range(time_start-100,time_end-100),rvalues[i],color="teal")
+#plt.plot(range(time_start-100,time_end-100),avg_r, linewidth=5,color="purple", label="")
+#plt.subplot
+#for i_c, c in enumerate(clusters):
+#    c = c[0]
+#    if cluster_p_values[i_c] <= 0.05:
+#        h = plt.axvspan(times[c.start]-100, times[c.stop - 1]-100,
+#                         color='pink', alpha=0.5,ymin=0.10,ymax=0.12)
+#plt.ylabel('Spearman r',fontsize=30)
+#plt.xlabel('Time (ms)',fontsize=30)
+#plt.xticks(fontsize=20)
+#plt.yticks(fontsize=20)
+#plt.hlines(0, -100, 1000)
+#plt.xlim(-100,1000)
+#plt.show()
+#####################################
+# Compute standard error of the mean (SEM) for 95% CI
+sem_r = sem(rvalues, axis=0)
+ci_upper = avg_r + 1.96 * sem_r  # Upper bound
+ci_lower = avg_r - 1.96 * sem_r  # Lower bound
+
+# Plotting all correlations
+times = range(0, epoch)
+plt.figure(figsize=(20, 10))
+
+# Plot individual participant correlations
+for i in range(0,bb):
+    plt.plot(range(time_start-100, time_end-100), rvalues[i], color="teal", alpha=0.6)
+
+# Plot average correlation with 95% CI shading
+plt.plot(range(time_start-100, time_end-100), avg_r, linewidth=5, color="purple", label="Average Correlation")
+plt.fill_between(range(time_start-100, time_end-100), ci_lower, ci_upper, color="purple", alpha=0.2, label="95% CI")
+
+# Highlight significant clusters
+plt.subplot
+for i_c, c in enumerate(clusters):
+    c = c[0]
+    if cluster_p_values[i_c] <= 0.05:
+        plt.axvspan(times[c.start]-100, times[c.stop - 1]-100, color='pink', alpha=0.5, ymin=0.10, ymax=0.12)
+
+# Formatting
+plt.ylabel('Spearman r', fontsize=30)
+plt.xlabel('Time (ms)', fontsize=30)
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+plt.hlines(0, -100, 1000, color='black', linestyle='dashed')
+plt.xlim(-100, 1000)
+plt.legend(fontsize=20)
+plt.show()
+
+#####################################
+# Add first set of results (e.g., Condition 1)
+saved_avg_r_data["avg_r_condition_VoneCornetS"] = avg_r
+saved_avg_r_data["ci_lower_condition_VoneCornetS"] = ci_lower
+saved_avg_r_data["ci_upper_condition_VoneCornetS"] = ci_upper
+# Extract significant cluster time ranges and store them in saved_avg_r_data
+saved_avg_r_data["significant_clusters_VoneCornetS"] = [
+    (times[c[0].start] - 100, times[c[0].stop - 1] - 100)  # Extract start and stop times
+    for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
+] # Store significant clusters
+saved_avg_r_data["cluster_p_values_VoneCornetS"] = cluster_p_values  # Store corresponding p-values
