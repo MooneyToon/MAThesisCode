@@ -1,0 +1,296 @@
+# THIS SEEMS TO SUCCESSFULLY LOAD PRE-TRAINED CVCL !!!!! (part 1 of 2)
+
+# Mount Google Drive (optional, if you need to access files from Drive)
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Install general required packages
+!pip install numpy scipy matplotlib imageio Pillow opencv-python pandas torchinfo gsheets wandb \
+    pycocoevalcap
+
+# Downgrade pip to a version compatible with older metadata (if needed for specific versions)
+!pip install "pip<24.1"
+
+# Install specific versions of key packages
+!pip install torch==2.0.1 torchvision==0.15.2 pytorch-lightning==1.6.1 spacy==3.0.0 \
+    huggingface_hub==0.17.3
+
+# Install OpenAI's CLIP (from GitHub, requires git)
+!pip install git+https://github.com/openai/CLIP.git@main
+
+# Download Spacy English model (optional, if you're using Spacy for NLP tasks)
+!python -m spacy download en_core_web_sm
+################################
+import spacy
+
+# Load the Spacy English model
+nlp = spacy.load('en_core_web_sm')
+
+# Test the model
+doc = nlp("Hello world!")
+for token in doc:
+    print(token.text, token.pos_)
+################################
+!pip install pytorch-lightning
+
+
+!pip show pytorch-lightning
+
+!touch /content/drive/My\ Drive/Colab\ Notebooks/multimodal/__init__.
+###################################
+#This ran with no errors????????????
+# Clone the repository
+!git clone https://github.com/wkvong/multimodal-baby.git
+
+# Change to the main directory (where multimodal.py is)
+%cd /content/multimodal-baby
+
+# Add the correct directory to Python's path
+import sys
+sys.path.append('/content/multimodal-baby')
+
+# Now try importing
+from multimodal.utils import map_structure
+################################################
+#Load CVCL
+
+import torch
+from multimodal.multimodal_lit import MultiModalLitModel
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+cvcl, preprocess = MultiModalLitModel.load_model(model_name="cvcl")
+cvcl = cvcl.to(device)
+cvcl.eval()
+
+# create random image to encode
+images = torch.rand(16, 3, 224, 224).to(device)
+image_features = cvcl.encode_image(images)
+
+# create texts to encode
+texts = ["ball", "puzzle", "car"]
+texts, texts_len = cvcl.tokenize(texts)
+texts, texts_len = texts.to(device), texts_len.to(device)
+texts_features = cvcl.encode_text(texts, texts_len)
+
+# get logits from a batch of images and texts
+logits_per_image, logits_per_text = cvcl(images, texts, texts_len)
+
+
+
+print("Shape of image_features:", image_features.shape)
+print(image_features)
+#################################
+#Running CVCL model analysis (part 2 of 2)
+!pip install mne
+######################################################
+# Import necessary libraries
+import torch
+from multimodal.multimodal_lit import MultiModalLitModel
+from torchvision import transforms, datasets
+from torch.utils.data import DataLoader
+import mne.stats as mstats
+import numpy as np
+from scipy.io import loadmat
+from scipy.stats import spearmanr
+
+
+# Set the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Load the CVCL model
+cvcl, preprocess = MultiModalLitModel.load_model(model_name="cvcl")
+cvcl = cvcl.to(device)
+cvcl.eval()
+
+# Define preprocessing for the dataset
+preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+# Load the dataset and dataloader
+image_data_path = "/content/drive/My Drive/Colab Notebooks/original visual stimuli"
+dataset = datasets.ImageFolder(root=image_data_path, transform=preprocess)
+dataloader = DataLoader(dataset, batch_size=16, shuffle=False, num_workers=2)  # Adjust batch size if needed
+
+# Process the dataset through the model
+for batch_idx, (images, labels) in enumerate(dataloader):  # labels are unused
+    images = images.to(device)  # Move images to the appropriate device
+
+    # Encode the batch of images using the model
+    image_features = cvcl.encode_image(images)
+
+    # Print results for each batch
+    print(f"Batch {batch_idx + 1}:")
+    print("Image Features Shape:", image_features.shape)
+    print("Image Features (First 5):", image_features[:5])  # Display a few features for inspection
+
+    # Optional: Stop after one batch for testing
+    break
+################################################################################
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Move to CPU and convert to NumPy array
+image_features_np = image_features.detach().cpu().numpy()
+
+# Calculate cosine similarity matrix for images
+similarity_matrix_images = cosine_similarity(image_features_np)
+
+print("Image Similarity Matrix:")
+print(similarity_matrix_images)
+
+#######################################
+import matplotlib.pyplot as plt
+# Create the Representational Dissimilarity Matrix (RDM)
+CVCL_model = 1 - similarity_matrix_images  # Convert similarity to dissimilarity
+
+# Plot RDM with title, axes titles, and colorbar
+plt.imshow(CVCL_model, cmap="viridis")  # You can use different colormaps (e.g., 'hot', 'cool', etc.)
+plt.colorbar()
+plt.title('Representational Dissimilarity Matrix (RDM)', fontsize=18)
+plt.ylabel('Images', fontsize=16)
+plt.xlabel('Compared Images', fontsize=16)
+plt.show()
+
+# turning the 16x16 RDM into a list of 120 values
+#rdm indices is a list of x and y values
+rdm_indices = np.triu_indices(16)
+cor_rdm = []
+for i in range(0,len(rdm_indices[0])):
+#pulls out x and y values, (index at 0)
+    x = rdm_indices[0][i]
+    y = rdm_indices[1][i]
+#skipping diagnol
+    if x==y:
+        continue
+ #appending values selected at x and y to RDM List
+    cor_rdm.append(CVCL_model[x,y])
+print(cor_rdm)
+len(cor_rdm)
+
+DataPath = '/content/drive/My Drive/Colab Notebooks/'
+fname='Results_diss_babies_pooled_decode_within_SVM_02.28.2024_16.29.56.mat'
+data = loadmat(DataPath+fname)['results'][0,0]
+DA = data['DA']
+times=data['times']
+epoch=len(times[0])
+np.shape(DA)
+
+#generating a 120 value list for an RDM for each participant and time point
+time_start = 0
+time_end = epoch
+accMeans = []
+#for each partic. for each time point, you are taking each value of 16'16 matrix (upper triangle) to generate a 120 len list)
+for part in range(0,np.shape(DA)[0]):
+#     if part+1 in subs_remove:
+#         continue
+    accTimesD = []
+    for point in range(time_start,time_end):
+        rdm_neural=[]
+#selecting pairs of coordinates of upper triangle to get values we want
+        for i in range(0,136):
+            r = rdm_indices[0][i]
+            c = rdm_indices[1][i]
+            #skipping diagnol
+            if r==c:
+                continue
+            rdm_neural.append(DA[part,point,r,c])
+        #adding rdm to list all time points for one partic.
+        accTimesD.append(rdm_neural)
+    #adding partic level list to list of all partic data, (leaving u with 34, 550,120)
+    accMeans.append(accTimesD)
+#reshaping to make it the correct order
+bb = np.shape(DA)[0]
+#bb = 5
+accMeans=np.array(accMeans).reshape(bb,epoch,120)
+np.shape(accMeans)
+
+#giving us the list of correlations, the behavioral rdm and neural rdm at each timepoint
+rvalues = []
+for partic in accMeans:
+    participant = []
+    for timepoint in partic:
+        #getting each r and p value for all the correlations
+        rho, p = spearmanr(timepoint, cor_rdm)
+        participant.append(rho)
+        #adding each indiv. partic correlation to a big list with all partic.
+    rvalues.append(participant)
+np.shape(rvalues)
+
+#making a list of zeros to compare R values to
+b=np.full([np.shape(DA)[0],epoch],0)
+#running the permutation cluster test
+T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.array(rvalues),b], tail=1, out_type="mask")
+
+#creating list of overall average of r values for all participants
+avg_r = np.mean(rvalues,0)
+np.shape(rvalues)
+
+#Plotting all the correlations
+#times=range(0,epoch)
+#plt.figure(figsize=(20,10))
+#for i in range(0,bb):
+#    plt.plot(range(time_start-100,time_end-100),rvalues[i],color="teal")
+#plt.plot(range(time_start-100,time_end-100),avg_r, linewidth=5,color="purple", label="")
+#plt.subplot
+#for i_c, c in enumerate(clusters):
+#    c = c[0]
+#    if cluster_p_values[i_c] <= 0.05:
+#        h = plt.axvspan(times[c.start]-100, times[c.stop - 1]-100,
+#                         color='pink', alpha=0.5,ymin=0.10,ymax=0.12)
+#plt.ylabel('Spearman r',fontsize=30)
+#plt.xlabel('Time (ms)',fontsize=30)
+#plt.xticks(fontsize=20)
+#plt.yticks(fontsize=20)
+#plt.hlines(0, -100, 1000)
+#plt.xlim(-100,1000)
+#plt.show()
+#####################################
+# Compute standard error of the mean (SEM) for 95% CI
+sem_r = sem(rvalues, axis=0)
+ci_upper = avg_r + 1.96 * sem_r  # Upper bound
+ci_lower = avg_r - 1.96 * sem_r  # Lower bound
+
+# Plotting all correlations
+times = range(0, epoch)
+plt.figure(figsize=(20, 10))
+
+# Plot individual participant correlations
+for i in range(0,bb):
+    plt.plot(range(time_start-100, time_end-100), rvalues[i], color="teal", alpha=0.6)
+
+# Plot average correlation with 95% CI shading
+plt.plot(range(time_start-100, time_end-100), avg_r, linewidth=5, color="purple", label="Average Correlation")
+plt.fill_between(range(time_start-100, time_end-100), ci_lower, ci_upper, color="purple", alpha=0.2, label="95% CI")
+
+# Highlight significant clusters
+plt.subplot
+for i_c, c in enumerate(clusters):
+    c = c[0]
+    if cluster_p_values[i_c] <= 0.05:
+        plt.axvspan(times[c.start]-100, times[c.stop - 1]-100, color='pink', alpha=0.5, ymin=0.10, ymax=0.12)
+
+# Formatting
+plt.ylabel('Spearman r', fontsize=30)
+plt.xlabel('Time (ms)', fontsize=30)
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+plt.hlines(0, -100, 1000, color='black', linestyle='dashed')
+plt.xlim(-100, 1000)
+plt.legend(fontsize=20)
+plt.show()
+
+#####################################
+# Add first set of results (e.g., Condition 1)
+saved_avg_r_data["avg_r_condition_CVCL"] = avg_r
+saved_avg_r_data["ci_lower_condition_CVCL"] = ci_lower
+saved_avg_r_data["ci_upper_condition_CVCL"] = ci_upper
+# Extract significant cluster time ranges and store them in saved_avg_r_data
+saved_avg_r_data["significant_clusters_CVCL"] = [
+    (times[c[0].start] - 100, times[c[0].stop - 1] - 100)  # Extract start and stop times
+    for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
+] # Store significant clusters
+saved_avg_r_data["cluster_p_values_CVCL"] = cluster_p_values  # Store corresponding p-values
