@@ -1,0 +1,520 @@
+#Complete code (Analyzing all model layers of TC_SAY_resnext)
+!pip install datasets
+!pip install torchvision
+!pip install mne
+
+#ALL IMPORTS
+#still need to be properly organized
+import os
+from PIL import Image
+import matplotlib.pyplot as plt
+from google.colab import drive
+from scipy.io import loadmat
+import torch
+import torchvision.models as models
+from torchvision import transforms, datasets, utils
+from PIL import Image
+from torchvision import transforms
+from torchvision import datasets
+from torch.utils.data import DataLoader
+import torch
+import torchvision.models as models
+from torchvision import transforms, datasets
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from torch.utils.data import DataLoader
+from PIL import Image
+from torchvision import transforms
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import spearmanr
+import mne.stats as mstats
+
+#Sucessful upload of images from google drive!! 23.12.21 - start_here##########
+import os
+from PIL import Image
+import matplotlib.pyplot as plt
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+folder_path = '/content/drive/My Drive/Colab Notebooks/original visual stimuli'
+image_files = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith(('.jpg', '.png', '.jpeg'))]
+
+images = [Image.open(file) for file in image_files]
+###############################################################################
+#current code for individual later, currently needed to pull needed variables
+#edit code futher to only keep necessary variables for this code!!
+# Define the model
+model = models.resnext50_32x4d(pretrained=False)
+model.fc = torch.nn.Linear(in_features=2048, out_features=6269, bias=True)
+model = torch.nn.DataParallel(model).cuda()
+
+# Load the model weights from the checkpoint
+checkpoint_path = '/content/drive/My Drive/Colab Notebooks/TC-SAY-resnext.tar'
+checkpoint = torch.load(checkpoint_path, weights_only=False)
+model.load_state_dict(checkpoint['model_state_dict'])
+
+# Set the model to evaluation mode
+model.eval()
+
+# Image Preprocessing
+preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+# Load the dataset
+image_data_path = "/content/drive/My Drive/Colab Notebooks/original visual stimuli"
+dataset = datasets.ImageFolder(root=image_data_path, transform=preprocess)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=2)
+
+# Extract features from different layers of the model
+def get_feature_vectors(model, dataloader, layer_name):
+    feature_vectors = []
+
+    # Hook function to extract features
+    def hook_fn(module, input, output):
+        feature_vectors.append(output.detach().cpu().numpy())
+
+    # Register the hook
+    layer = dict(model.module.named_modules())[layer_name]
+    handle = layer.register_forward_hook(hook_fn)
+
+    # Pass the data through the model
+    for inputs, labels in dataloader:
+        inputs = inputs.cuda()
+        model(inputs)
+
+    # Remove the hook
+    handle.remove()
+
+    # Concatenate all feature vectors and reshape if necessary
+    feature_vectors = np.concatenate(feature_vectors, axis=0)
+
+    # Flatten the feature vectors if they are more than 2D
+    if feature_vectors.ndim > 2:
+        num_samples = feature_vectors.shape[0]
+        flattened_features = feature_vectors.reshape(num_samples, -1)
+    else:
+        flattened_features = feature_vectors
+
+    return flattened_features
+
+# Extract features from a specific layer, e.g., 'layer4'
+layer_name = 'layer4.0.bn2'
+all_feature_vectors = get_feature_vectors(model, dataloader, layer_name)
+
+# Calculate cosine similarity matrix
+similarity_matrix = cosine_similarity(all_feature_vectors)
+
+# Print the similarity matrix
+print("Cosine similarity matrix:")
+print(similarity_matrix)
+
+TC_SAY_resnext = np.array(1-similarity_matrix)
+
+#Plot RDM with title, axes titles, and colorbar TC_SAY_resnext
+import matplotlib.pyplot as plt
+
+plt.imshow(TC_SAY_resnext)
+plt.colorbar()
+plt.title('Representational Dissimilarity Matrix')
+plt.ylabel('Images', fontsize=16)
+plt.xlabel('Compared Images', fontsize=16)
+
+# turning the 16x16 RDM into a list of 120 values
+#rdm indices is a list of x and y values
+rdm_indices = np.triu_indices(16)
+cor_rdm = []
+for i in range(0,len(rdm_indices[0])):
+#pulls out x and y values, (index at 0)
+    x = rdm_indices[0][i]
+    y = rdm_indices[1][i]
+#skipping diagnol
+    if x==y:
+        continue
+ #appending values selected at x and y to RDM List
+    cor_rdm.append(TC_SAY_resnext[x,y])
+print(cor_rdm)
+len(cor_rdm)
+
+DataPath = '/content/drive/My Drive/Colab Notebooks/'
+fname='Results_diss_babies_pooled_decode_within_SVM_02.28.2024_16.29.56.mat'
+data = loadmat(DataPath+fname)['results'][0,0]
+DA = data['DA']
+times=data['times']
+epoch=len(times[0])
+np.shape(DA)
+
+#generating a 120 value list for an RDM for each participant and time point
+time_start = 0
+time_end = epoch
+accMeans = []
+#for each partic. for each time point, you are taking each value of 16'16 matrix (upper triangle) to generate a 120 len list)
+for part in range(0,np.shape(DA)[0]):
+#     if part+1 in subs_remove:
+#         continue
+    accTimesD = []
+    for point in range(time_start,time_end):
+        rdm_neural=[]
+#selecting pairs of coordinates of upper triangle to get values we want
+        for i in range(0,136):
+            r = rdm_indices[0][i]
+            c = rdm_indices[1][i]
+            #skipping diagnol
+            if r==c:
+                continue
+            rdm_neural.append(DA[part,point,r,c])
+        #adding rdm to list all time points for one partic.
+        accTimesD.append(rdm_neural)
+    #adding partic level list to list of all partic data, (leaving u with 34, 550,120)
+    accMeans.append(accTimesD)
+#reshaping to make it the correct order
+bb = np.shape(DA)[0]
+#bb = 5
+accMeans=np.array(accMeans).reshape(bb,epoch,120)
+np.shape(accMeans)
+
+#giving us the list of correlations, the behavioral rdm and neural rdm at each timepoint
+rvalues = []
+for partic in accMeans:
+    participant = []
+    for timepoint in partic:
+        #getting each r and p value for all the correlations
+        rho, p = spearmanr(timepoint, cor_rdm)
+        participant.append(rho)
+        #adding each indiv. partic correlation to a big list with all partic.
+    rvalues.append(participant)
+np.shape(rvalues)
+
+#making a list of zeros to compare R values to
+b=np.full([np.shape(DA)[0],epoch],0)
+#running the permutation cluster test
+T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.array(rvalues),b], tail=1, out_type="mask")
+
+#creating list of overall average of r values for all participants
+avg_r = np.mean(rvalues,0)
+np.shape(rvalues)
+
+###############################################################################
+#TEST 4 (SKIP) stores Sim Matrix in dictionary - 1 for each layer
+#takes about an hour to run
+#Part 1 of 3
+
+import torch
+import torchvision.models as models
+from torchvision import transforms, datasets
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from torch.utils.data import DataLoader
+
+# Define the model
+model = models.resnext50_32x4d(pretrained=False)
+model.fc = torch.nn.Linear(in_features=2048, out_features=6269, bias=True)
+model = torch.nn.DataParallel(model).cuda()
+
+# Load the model weights from the checkpoint
+checkpoint_path = '/content/drive/My Drive/Colab Notebooks/TC-SAY-resnext.tar'
+checkpoint = torch.load(checkpoint_path, weights_only=False)
+model.load_state_dict(checkpoint['model_state_dict'])
+
+# Set the model to evaluation mode
+model.eval()
+
+# Image Preprocessing
+preprocess = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+# Load the dataset
+image_data_path = "/content/drive/My Drive/Colab Notebooks/original visual stimuli"
+dataset = datasets.ImageFolder(root=image_data_path, transform=preprocess)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=2)
+
+# Extract features from different layers of the model
+def get_feature_vectors(model, dataloader, layer_name):
+    feature_vectors = []
+
+    # Hook function to extract features
+    def hook_fn(module, input, output):
+        feature_vectors.append(output.detach().cpu().numpy())
+
+    # Register the hook
+    layer = dict(model.module.named_modules())[layer_name]
+    handle = layer.register_forward_hook(hook_fn)
+
+    # Pass the data through the model
+    for inputs, labels in dataloader:
+        inputs = inputs.cuda()
+        model(inputs)
+
+    # Remove the hook
+    handle.remove()
+
+    # Concatenate all feature vectors and reshape if necessary
+    feature_vectors = np.concatenate(feature_vectors, axis=0)
+
+    # Flatten the feature vectors if they are more than 2D
+    if feature_vectors.ndim > 2:
+        num_samples = feature_vectors.shape[0]
+        flattened_features = feature_vectors.reshape(num_samples, -1)
+    else:
+        flattened_features = feature_vectors
+
+    return flattened_features
+
+# List of all layers in the model to test
+layers_to_test = [
+    'conv1', 'bn1', 'relu', 'maxpool',
+    'layer1', 'layer1.0', 'layer1.0.conv1', 'layer1.0.bn1', 'layer1.0.conv2', 'layer1.0.bn2', 'layer1.0.conv3', 'layer1.0.bn3', 'layer1.0.relu', 'layer1.0.downsample', 'layer1.0.downsample.0', 'layer1.0.downsample.1',
+    'layer1.1', 'layer1.1.conv1', 'layer1.1.bn1', 'layer1.1.conv2', 'layer1.1.bn2', 'layer1.1.conv3', 'layer1.1.bn3', 'layer1.1.relu',
+    'layer1.2', 'layer1.2.conv1', 'layer1.2.bn1', 'layer1.2.conv2', 'layer1.2.bn2', 'layer1.2.conv3', 'layer1.2.bn3', 'layer1.2.relu',
+    'layer2', 'layer2.0', 'layer2.0.conv1', 'layer2.0.bn1', 'layer2.0.conv2', 'layer2.0.bn2', 'layer2.0.conv3', 'layer2.0.bn3', 'layer2.0.relu', 'layer2.0.downsample', 'layer2.0.downsample.0', 'layer2.0.downsample.1',
+    'layer2.1', 'layer2.1.conv1', 'layer2.1.bn1', 'layer2.1.conv2', 'layer2.1.bn2', 'layer2.1.conv3', 'layer2.1.bn3', 'layer2.1.relu',
+    'layer2.2', 'layer2.2.conv1', 'layer2.2.bn1', 'layer2.2.conv2', 'layer2.2.bn2', 'layer2.2.conv3', 'layer2.2.bn3', 'layer2.2.relu',
+    'layer2.3', 'layer2.3.conv1', 'layer2.3.bn1', 'layer2.3.conv2', 'layer2.3.bn2', 'layer2.3.conv3', 'layer2.3.bn3', 'layer2.3.relu',
+    'layer3', 'layer3.0', 'layer3.0.conv1', 'layer3.0.bn1', 'layer3.0.conv2', 'layer3.0.bn2', 'layer3.0.conv3', 'layer3.0.bn3', 'layer3.0.relu', 'layer3.0.downsample', 'layer3.0.downsample.0', 'layer3.0.downsample.1',
+    'layer3.1', 'layer3.1.conv1', 'layer3.1.bn1', 'layer3.1.conv2', 'layer3.1.bn2', 'layer3.1.conv3', 'layer3.1.bn3', 'layer3.1.relu',
+    'layer3.2', 'layer3.2.conv1', 'layer3.2.bn1', 'layer3.2.conv2', 'layer3.2.bn2', 'layer3.2.conv3', 'layer3.2.bn3', 'layer3.2.relu',
+    'layer3.3', 'layer3.3.conv1', 'layer3.3.bn1', 'layer3.3.conv2', 'layer3.3.bn2', 'layer3.3.conv3', 'layer3.3.bn3', 'layer3.3.relu',
+    'layer3.4', 'layer3.4.conv1', 'layer3.4.bn1', 'layer3.4.conv2', 'layer3.4.bn2', 'layer3.4.conv3', 'layer3.4.bn3', 'layer3.4.relu',
+    'layer3.5', 'layer3.5.conv1', 'layer3.5.bn1', 'layer3.5.conv2', 'layer3.5.bn2', 'layer3.5.conv3', 'layer3.5.bn3', 'layer3.5.relu',
+    'layer4', 'layer4.0', 'layer4.0.conv1', 'layer4.0.bn1', 'layer4.0.conv2', 'layer4.0.bn2', 'layer4.0.conv3', 'layer4.0.bn3', 'layer4.0.relu', 'layer4.0.downsample', 'layer4.0.downsample.0', 'layer4.0.downsample.1',
+    'layer4.1', 'layer4.1.conv1', 'layer4.1.bn1', 'layer4.1.conv2', 'layer4.1.bn2', 'layer4.1.conv3', 'layer4.1.bn3', 'layer4.1.relu',
+    'layer4.2', 'layer4.2.conv1', 'layer4.2.bn1', 'layer4.2.conv2', 'layer4.2.bn2', 'layer4.2.conv3', 'layer4.2.bn3', 'layer4.2.relu',
+    'avgpool', 'fc'
+]
+
+# Initialize the dictionary to store similarity matrices
+sim_matrices = {}
+
+# Loop through each layer, extract features, and calculate similarity matrix
+for layer_name in layers_to_test:
+    print(f"Extracting features from {layer_name}...")
+    try:
+        feature_vectors = get_feature_vectors(model, dataloader, layer_name)
+        similarity_matrix = cosine_similarity(feature_vectors)
+
+        # Store the similarity matrix in the dictionary
+        sim_matrices[layer_name] = similarity_matrix
+
+        print(f"Cosine similarity matrix for {layer_name} saved in sim_matrices.")
+    except Exception as e:
+        print(f"An error occurred while processing {layer_name}: {e}")
+
+# sim_matrices now contains the similarity matrices for each layer
+##################################
+# Initialize a dictionary to store the transformed similarity matrices
+transformed_matrices = {}
+
+# Loop through each layer in the sim_matrices dictionary
+for layer_name, similarity_matrix in sim_matrices.items():
+    # Perform the transformation
+    TC_SAY_resnext = np.array(1 - similarity_matrix)
+
+    # Store the transformed matrix in the new dictionary
+    transformed_matrices[layer_name] = TC_SAY_resnext
+
+    print(f"Transformed matrix for {layer_name} saved in transformed_matrices.")
+
+# transformed_matrices now contains the transformed similarity matrices for each layer
+############################################
+# Initialize a dictionary to store the RDM lists for each layer
+rdm_lists = {}
+
+# Loop through each layer in the transformed_matrices dictionary
+for layer_name, TC_SAY_resnext in transformed_matrices.items():
+    # Get the indices of the upper triangle (excluding the diagonal)
+    rdm_indices = np.triu_indices(TC_SAY_resnext.shape[0])
+
+    cor_rdm = []
+
+    # Loop through the indices and extract the corresponding values
+    for i in range(len(rdm_indices[0])):
+        x = rdm_indices[0][i]
+        y = rdm_indices[1][i]
+
+        # Skip diagonal elements
+        if x == y:
+            continue
+
+        # Append the value to the cor_rdm list
+        cor_rdm.append(TC_SAY_resnext[x, y])
+
+    # Store the list in the rdm_lists dictionary
+    rdm_lists[layer_name] = cor_rdm
+
+    # Optionally print the results for verification
+    print(f"RDM list for {layer_name}:")
+    print(cor_rdm)
+    print(f"Length of RDM list: {len(cor_rdm)}")
+
+# rdm_lists now contains the RDM lists for each layer
+######################################################
+from scipy.stats import spearmanr
+
+# Initialize a dictionary to store r-values for each layer
+rvalues_dict = {}
+
+# Assume accMeans is a list of behavioral RDMs (e.g., participant x timepoints x features)
+# rdm_lists is a dictionary where each key corresponds to a layer name and each value is a list of 120 values
+
+for layer_name, cor_rdm in rdm_lists.items():
+    rvalues = []
+    for partic in accMeans:
+        participant_rhos = []
+        for timepoint in partic:
+            # Calculate the Spearman correlation between the behavioral RDM and the neural RDM (cor_rdm)
+            rho, _ = spearmanr(timepoint, cor_rdm)
+            participant_rhos.append(rho)
+        rvalues.append(participant_rhos)
+
+    # Store the r-values in the dictionary
+    rvalues_dict[layer_name] = np.array(rvalues)
+
+# rvalues_dict now contains the Spearman correlation values for each layer
+###################################################
+import numpy as np
+from mne.stats import permutation_cluster_test as pcluster_test
+
+
+# Initialize a new dictionary to store the results
+significant_clusters_dict = {}
+
+# Loop through each key in rvalues_dict
+for layer_name, rvalues in rvalues_dict.items():
+    print(f"Running permutation cluster test for {layer_name}...")
+
+    # Making a list of zeros to compare R values to
+    b = np.full([np.shape(DA)[0], epoch], 0)
+
+    # Running the permutation cluster test
+    T_obs, clusters, cluster_p_values, H0 = pcluster_test([np.array(rvalues), b], tail=1, out_type="mask")
+
+    # Define a significance threshold
+    significance_threshold = 0.05
+
+    # Count the number of significant clusters
+    num_significant_clusters = np.sum(cluster_p_values <= significance_threshold)
+
+    # Store the number of significant clusters in the dictionary
+    significant_clusters_dict[layer_name] = num_significant_clusters
+
+    print(f"Number of significant clusters for {layer_name}: {num_significant_clusters}")
+
+# The significant_clusters_dict now contains the number of significant clusters for each layer
+###############################################################################
+#TESTING (SKIP)
+
+#Part 2 of 3
+
+import numpy as np
+from mne.stats import permutation_cluster_test as pcluster_test
+
+# Initialize dictionaries to store the cluster p-values and clusters for each layer
+cluster_p_values_dict = {}
+clusters_dict = {}
+
+# Loop through each key in rvalues_dict
+for layer_name, rvalues in rvalues_dict.items():
+    print(f"Running permutation cluster test for {layer_name}...")
+
+    # Making a list of zeros to compare R values to
+    b = np.full([np.shape(DA)[0], epoch], 0)
+
+    # Running the permutation cluster test
+    T_obs, clusters, cluster_p_values, H0 = pcluster_test([np.array(rvalues), b], tail=1, out_type="mask")
+
+    # Store the cluster p-values and clusters in their respective dictionaries
+    cluster_p_values_dict[layer_name] = cluster_p_values
+    clusters_dict[layer_name] = clusters
+
+    # Optionally count the number of significant clusters
+    significance_threshold = 0.05
+    num_significant_clusters = np.sum(cluster_p_values <= significance_threshold)
+
+    print(f"Number of significant clusters for {layer_name}: {num_significant_clusters}")
+
+# The cluster_p_values_dict now contains the cluster p-values for each layer
+# The clusters_dict now contains the clusters for each layer
+
+print(cluster_p_values_dict)
+###############################################################################
+# Initialize a new dictionary to store the results
+cleaned_clusters_dict = {}
+
+# Iterate through each key and value in the original clusters_dict
+for layer_name, clusters in clusters_dict.items():
+    # Initialize a list to store the cleaned cluster data
+    cleaned_clusters = []
+
+    # Iterate through each cluster (which contains a slice)
+    for cluster in clusters:
+        cluster_slice = cluster[0]  # Get the slice object (first element in the tuple)
+        # Extract the start and stop from the slice and append as a tuple
+        cleaned_clusters.append((cluster_slice.start, cluster_slice.stop))
+
+    # Store the cleaned clusters in the new dictionary
+    cleaned_clusters_dict[layer_name] = cleaned_clusters
+
+# Now cleaned_clusters_dict contains the desired structure
+
+print(cleaned_clusters_dict)
+###############################################################################
+# TESTING (SKIP)
+
+# Part 3 of 3
+#Distinguish strength of p-value for clusters
+# Import necessary libraries
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Create a new figure
+plt.figure(figsize=(20, 10))
+
+# Define the time range for the x-axis
+times = range(0, epoch)
+
+# Set up the y-axis ticks for layers
+layer_names = list(cleaned_clusters_dict.keys())
+y_positions = np.arange(len(layer_names))  # Y-axis positions for each layer
+
+# Iterate through each layer in cleaned_clusters_dict
+for i, layer_name in enumerate(layer_names):
+    # Iterate through each cluster for the current layer
+    for i_c, (start, stop) in enumerate(cleaned_clusters_dict[layer_name]):
+        p_value = cluster_p_values_dict[layer_name][i_c]
+
+        # Assign color based on p-value thresholds
+        if p_value <= 0.001:
+            color = 'green'
+        elif p_value <= 0.01:
+            color = 'blue'
+        elif p_value <= 0.05:
+            color = 'red'
+        else:
+            continue  # Skip if p_value > 0.05 (not significant)
+
+        # Plot the vertical lines for the significant cluster
+        plt.vlines(x=times[start:stop], ymin=i - 0.4, ymax=i + 0.4,
+                   color=color, alpha=0.5)
+
+# Set the x-axis range for time points
+plt.xlim(-100, 1000)
+
+# Customize the plot
+plt.ylabel('Layers', fontsize=30)
+plt.xlabel('Time (ms)', fontsize=30)
+plt.title('Significant Clusters Across Layers', fontsize=30)
+
+plt.yticks(y_positions, layer_names)  # Set y-ticks to layer names
+plt.grid(True, axis='x')  # Add grid for better visualization
+plt.tight_layout()  # Adjust layout
+plt.show()
