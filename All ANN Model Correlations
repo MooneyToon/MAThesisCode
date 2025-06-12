@@ -1,4 +1,5 @@
 # Final Plot
+#Plot Spearman correlation between infant RDM outputs and RDM outputs for the selected layer of each model
 
 import matplotlib.pyplot as plt
 import numpy as np
