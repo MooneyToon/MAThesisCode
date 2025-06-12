@@ -1,4 +1,4 @@
-# THIS SEEMS TO SUCCESSFULLY LOAD PRE-TRAINED CVCL !!!!! (part 1 of 2)
+# LOAD PRE-TRAINED CVCL (part 1 of 2)
 
 # Mount Google Drive (optional, if you need to access files from Drive)
 from google.colab import drive
@@ -284,7 +284,7 @@ plt.legend(fontsize=20)
 plt.show()
 
 #####################################
-# Add first set of results (e.g., Condition 1)
+# Add first set of results (CVCL)
 saved_avg_r_data["avg_r_condition_CVCL"] = avg_r
 saved_avg_r_data["ci_lower_condition_CVCL"] = ci_lower
 saved_avg_r_data["ci_upper_condition_CVCL"] = ci_upper
