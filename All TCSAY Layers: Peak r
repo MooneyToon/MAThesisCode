@@ -1,3 +1,4 @@
+# TCSAY all Layers needs to be run before this code can work
 #Code that plots peak r-value for significant clusters in each layer (not p-value)
 # pull directly from rvalues_dict = {}
 import numpy as np
