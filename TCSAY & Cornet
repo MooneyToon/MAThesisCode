@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import sem, spearmanr
 import mne.stats as mstats
 
-#Sucessful upload of images from google drive!! 23.12.21 - start_here##########
+#Code to upload images from google drive
 import os
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -44,8 +44,8 @@ image_files = [os.path.join(folder_path, file) for file in os.listdir(folder_pat
 
 images = [Image.open(file) for file in image_files]
 
-#TEST 3 (WORKS - USE THIS FOR NOW)#############################################
-#Check which layer I should pull data from
+#Imports needed to run code (many if not all repeated from above)
+#Make sure to choose correct model layer and have pretrained model weights saved for analysis
 import torch
 import torchvision.models as models
 from torchvision import transforms, datasets
@@ -122,9 +122,10 @@ similarity_matrix = cosine_similarity(all_feature_vectors)
 print("Cosine similarity matrix:")
 print(similarity_matrix)
 
+#Name similarity matrix for specific model
 TC_SAY_resnext = np.array(1-similarity_matrix)
 
-#Plot RDM with title, axes titles, and colorbar TC_SAY_resnext
+#Plot RDM with title, axes titles, and colorbar for TC_SAY_resnext
 import matplotlib.pyplot as plt
 
 plt.imshow(TC_SAY_resnext)
@@ -206,7 +207,8 @@ T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.arra
 #creating list of overall average of r values for all participants
 avg_r = np.mean(rvalues,0)
 np.shape(rvalues)
-
+###########################################################
+# COMMENTED OUT TO SELECT PLOT WITH 95% CI INTERVAL INSTEAD
 #Plotting all the correlations
 #times=range(0,epoch)
 #plt.figure(figsize=(20,10))
@@ -267,7 +269,7 @@ saved_avg_r_data = {
     "time": list(range(time_start - 100, time_end - 100))  # Ensure time remains consistent
 }
 
-# Add first set of results (e.g., Condition 1)
+# Add first set of results (e.g., Condition TCSAY)
 saved_avg_r_data["avg_r_condition_TCSAY"] = avg_r
 saved_avg_r_data["ci_lower_condition_TCSAY"] = ci_lower
 saved_avg_r_data["ci_upper_condition_TCSAY"] = ci_upper
@@ -279,7 +281,7 @@ saved_avg_r_data["significant_clusters_TCSAY"] = [
 saved_avg_r_data["cluster_p_values_TCSAY"] = cluster_p_values  # Store corresponding p-values
 
 #############################################################
-
+# CODE FOR RUNNING CORNET MODEL
 filename = '/content/drive/My Drive/Colab Notebooks/CORnet-S_IT_output_feats (1).npy'
 dataset_cor = np.load(filename, encoding='bytes')
 
@@ -316,7 +318,6 @@ plt.title('Representational Dissimilarity Matrix')
 plt.ylabel('Images', fontsize=16)
 plt.xlabel('Compared Images', fontsize=16)
 
-#TEST (SKIP)
 #Running Spearman correlation between Cornet and infant data
 
 #giving us the list of correlations, the behavioral rdm and neural rdm at each timepoint
@@ -339,7 +340,8 @@ T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.arra
 #creating list of overall average of r values for all partipants
 avg_r = np.mean(rvalues,0)
 np.shape(rvalues)
-
+###############################################
+# COMMENTED OUT TO SELECT PLOT WITH 95% CI INTERVAL INSTEAD
 #Plotting all the correlations
 #times=range(0,epoch)
 #plt.figure(figsize=(20,10))
@@ -395,7 +397,7 @@ plt.legend(fontsize=20)
 plt.show()
 
 #################################################
-# Add first set of results (e.g., Condition 1)
+# Add set of results (e.g., Condition cornet)
 saved_avg_r_data["avg_r_condition_cornet"] = avg_r
 saved_avg_r_data["ci_lower_condition_cornet"] = ci_lower
 saved_avg_r_data["ci_upper_condition_cornet"] = ci_upper
