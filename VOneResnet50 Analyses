@@ -374,7 +374,7 @@ plt.legend(fontsize=20)
 plt.show()
 
 #####################################
-# Add first set of results (e.g., Condition VOneResnet50)
+# Add set of results (e.g., Condition VOneResnet50)
 saved_avg_r_data["avg_r_condition_VOneResnet50"] = avg_r
 saved_avg_r_data["ci_lower_condition_VOneResnet50"] = ci_lower
 saved_avg_r_data["ci_upper_condition_VOneResnet50"] = ci_upper
