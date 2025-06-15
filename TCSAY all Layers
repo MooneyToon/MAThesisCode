@@ -1,4 +1,4 @@
-#Complete code (Analyzing all model layers of TC_SAY_resnext)
+#Code for Analyzing all model layers of TC_SAY_resnext
 !pip install datasets
 !pip install torchvision
 !pip install mne
@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 import mne.stats as mstats
 
-#Sucessful upload of images from google drive!! 23.12.21 - start_here##########
+#Upload of images from google drive
 import os
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -44,8 +44,8 @@ image_files = [os.path.join(folder_path, file) for file in os.listdir(folder_pat
 
 images = [Image.open(file) for file in image_files]
 ###############################################################################
-#current code for individual later, currently needed to pull needed variables
-#edit code futher to only keep necessary variables for this code!!
+#Current code for individual later, currently needed to pull needed variables
+#edit code futher to only keep necessary variables for this code - if needed
 # Define the model
 model = models.resnext50_32x4d(pretrained=False)
 model.fc = torch.nn.Linear(in_features=2048, out_features=6269, bias=True)
@@ -199,10 +199,10 @@ T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.arra
 #creating list of overall average of r values for all participants
 avg_r = np.mean(rvalues,0)
 np.shape(rvalues)
-
+#End of code for single layer analysis
 ###############################################################################
-#TEST 4 (SKIP) stores Sim Matrix in dictionary - 1 for each layer
-#takes about an hour to run
+#CODE FOR ANALYSIS FOR ALL LAYERS: stores Sim Matrix in dictionary - 1 for each layer
+#Takes about an hour to run
 #Part 1 of 3
 
 import torch
@@ -411,7 +411,7 @@ for layer_name, rvalues in rvalues_dict.items():
 
 # The significant_clusters_dict now contains the number of significant clusters for each layer
 ###############################################################################
-#TESTING (SKIP)
+#NEXT STEP IN CODE
 
 #Part 2 of 3
 
@@ -468,7 +468,7 @@ for layer_name, clusters in clusters_dict.items():
 
 print(cleaned_clusters_dict)
 ###############################################################################
-# TESTING (SKIP)
+#NEXT STEP IN CODE
 
 # Part 3 of 3
 #Distinguish strength of p-value for clusters
