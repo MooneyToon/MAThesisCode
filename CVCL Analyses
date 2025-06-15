@@ -38,7 +38,6 @@ for token in doc:
 
 !touch /content/drive/My\ Drive/Colab\ Notebooks/multimodal/__init__.
 ###################################
-#This ran with no errors????????????
 # Clone the repository
 !git clone https://github.com/wkvong/multimodal-baby.git
 
@@ -229,6 +228,7 @@ T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.arra
 avg_r = np.mean(rvalues,0)
 np.shape(rvalues)
 
+#COMMENTED OUT TO SELECT CODE TO PLOT 95% CI INTERVAL
 #Plotting all the correlations
 #times=range(0,epoch)
 #plt.figure(figsize=(20,10))
@@ -284,7 +284,7 @@ plt.legend(fontsize=20)
 plt.show()
 
 #####################################
-# Add first set of results (CVCL)
+# Add set of results (CVCL)
 saved_avg_r_data["avg_r_condition_CVCL"] = avg_r
 saved_avg_r_data["ci_lower_condition_CVCL"] = ci_lower
 saved_avg_r_data["ci_upper_condition_CVCL"] = ci_upper
