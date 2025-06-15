@@ -1,6 +1,6 @@
 # Only load VOneResnet50
 
-#Setup with VoneNet architecture - seems to be successful
+#Setup with VoneNet architecture
 
 #!pip install git+https://github.com/openai/CLIP.git@main
 #!git clone https://github.com/dicarlolab/vonenet.git
@@ -121,7 +121,7 @@ model.eval()
 print("Model loaded and ready for inference!")
 
 ########################################################
-#Sucessful upload of images from google drive!! 23.12.21 - start_here##########
+#Code to upload of images from google drive
 import os
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -182,12 +182,13 @@ def get_feature_vectors(model, dataloader, layer_name):
 
 
 # Extract features from a specific layer
-layer_name = 'model.layer4'
+layer_name = 'model.layer4' #matching TCSAY chosen layer for consistency
 all_feature_vectors = get_feature_vectors(model, dataloader, layer_name)
 
 print("All feature vectors:")
 print(all_feature_vectors)
 
+#Commented out to account for nondeterminism
 # Calculate cosine similarity matrix
 #similarity_matrix = cosine_similarity(all_feature_vectors)
 
@@ -317,6 +318,7 @@ T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.arra
 avg_r = np.mean(rvalues,0)
 np.shape(rvalues)
 
+#COMMENTED OUT TO SELECT PLOT WITH 95% CI INTERVALS
 #Plotting all the correlations
 #times=range(0,epoch)
 #plt.figure(figsize=(20,10))
@@ -372,7 +374,7 @@ plt.legend(fontsize=20)
 plt.show()
 
 #####################################
-# Add first set of results (e.g., Condition 1)
+# Add first set of results (e.g., Condition VOneResnet50)
 saved_avg_r_data["avg_r_condition_VOneResnet50"] = avg_r
 saved_avg_r_data["ci_lower_condition_VOneResnet50"] = ci_lower
 saved_avg_r_data["ci_upper_condition_VOneResnet50"] = ci_upper
