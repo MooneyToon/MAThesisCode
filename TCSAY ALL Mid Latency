@@ -1,3 +1,4 @@
+# TCSAY all Layers needs to be run before this code can work
 #PLOT FOR ANALYSIS OF ALL TCSAY MODEL LAYERS WITH MID-LATENCY PERIOD INDICATED
 # Import necessary libraries
 import matplotlib.pyplot as plt
