@@ -1,4 +1,4 @@
-#Update Legend
+#PLOT FOR ANALYSIS OF ALL TCSAY MODEL LAYERS WITH MID-LATENCY PERIOD INDICATED
 # Import necessary libraries
 import matplotlib.pyplot as plt
 import numpy as np
