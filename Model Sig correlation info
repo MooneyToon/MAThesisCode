@@ -1,3 +1,4 @@
+# RUN THIS CODE AFTER PLOTTING & ANALYSIS FOR A SINGLE MODEL IS COMPLETED
 # Extract significant time bands from pink bars
 significant_time_bands = []
 
