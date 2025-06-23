@@ -1,0 +1,71 @@
+# Analyzing mean difference between VGG19 & each other model
+from mne.stats import permutation_cluster_test
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Store cluster results
+cluster_perm_results = {}
+
+# Set threshold for initial cluster forming (can be None to use default)
+threshold = None
+n_permutations = 1000
+alpha = 0.05
+
+# Extract VGG19 data
+vgg_data = np.array(rvalues_dict2["VGG19"])
+
+# List of models to compare to VGG19
+compare_models = ['TCSAY', 'cornet', 'CVCL', 'VoneCornetS', 'VOneResnet50']
+
+# Loop over each model
+for model in compare_models:
+    model_data = np.array(rvalues_dict2[model])
+
+    # Confirm shape match
+    assert vgg_data.shape == model_data.shape, f"Shape mismatch: {model}"
+
+    # Compute difference
+    diff = vgg_data - model_data  # shape: (n_subjects, n_timepoints)
+
+    # Cluster-based permutation test
+    T_obs, clusters, cluster_p_values, H0 = permutation_cluster_test(
+        [diff],
+        n_permutations=n_permutations,
+        tail=0,
+        threshold=threshold,
+        seed=42,
+        out_type='mask',
+        verbose=True
+    )
+
+    # Store results
+    cluster_perm_results[model] = {
+        "T_obs": T_obs,
+        "clusters": clusters,
+        "cluster_p_values": cluster_p_values,
+        "H0": H0
+    }
+
+    # Print significant clusters
+    sig_clusters = np.where(cluster_p_values < alpha)[0]
+    if len(sig_clusters) > 0:
+        print(f"\n✅ Significant clusters found: VGG19 vs {model}")
+        for i in sig_clusters:
+            print(f"  - Cluster {i}, p = {cluster_p_values[i]:.4f}")
+    else:
+        print(f"\n❌ No significant clusters found: VGG19 vs {model}")
+
+    ################################################
+    # Calculate mean difference for the current model
+    mean_diff = np.mean(vgg_data - model_data, axis=0)
+
+    # Plot the mean difference for the current model
+    plt.figure(figsize=(10, 3))
+    plt.plot(mean_diff, label=f'Mean Difference (VGG19 - {model})', color='blue')
+    plt.axhline(0, color='gray', linestyle='--')
+    plt.title(f'Mean Difference: VGG19 vs {model}')
+    plt.xlabel('Timepoints')
+    plt.ylabel('Difference')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
