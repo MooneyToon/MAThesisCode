@@ -518,3 +518,45 @@ plt.yticks(y_positions, layer_names)  # Set y-ticks to layer names
 plt.grid(True, axis='x')  # Add grid for better visualization
 plt.tight_layout()  # Adjust layout
 plt.show()
+####################################################################
+#Code to save and load output for variables 'rvalues_dict' & 'rdm_lists' 
+import pickle
+
+# 1. Mount Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# 2. Define path where you want to save the file
+save_path = '/content/drive/My Drive/Colab Notebooks/rvalues_dict.pkl'
+
+# 3. Save the variable
+with open(save_path, 'wb') as f:
+    pickle.dump(rvalues_dict, f)
+
+print("Saved successfully!")
+
+####################################
+# To load the variable back into a new session
+with open(save_path, 'rb') as f:
+    rvalues_dict = pickle.load(f)
+
+################################
+import pickle
+
+# 1. Mount Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# 2. Define path where you want to save the file
+save_path = '/content/drive/My Drive/Colab Notebooks/rdm_lists.pkl'
+
+# 3. Save the variable
+with open(save_path, 'wb') as f:
+    pickle.dump(rdm_lists, f)
+
+print("Saved successfully!")
+
+####################################
+# To load the variable back into a new session
+with open(save_path, 'rb') as f:
+    rdm_lists = pickle.load(f)
