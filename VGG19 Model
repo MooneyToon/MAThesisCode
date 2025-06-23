@@ -1,0 +1,280 @@
+# VGG19 Model
+
+!pip install mne
+from scipy.stats import sem, spearmanr
+import mne.stats as mstats
+from scipy.io import loadmat
+
+# Mount Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Imports
+import os
+import numpy as np
+from keras.preprocessing import image
+from keras.applications.vgg19 import VGG19, preprocess_input
+from keras.models import Model
+
+# Define the path to your dataset folder
+folder_path = '/content/drive/My Drive/Colab Notebooks/original visual stimuli'
+
+# Recursively get all image file paths from folder and subfolders
+image_files = []
+
+for root, dirs, files in os.walk(folder_path):
+    for file in files:
+        if file.lower().endswith(('.jpg', '.png', '.jpeg')):
+            image_files.append(os.path.join(root, file))
+
+print(f"Found {len(image_files)} images.")
+
+# Load VGG19 model and select the intermediate layer for features
+base_model = VGG19(weights='imagenet')
+model = Model(inputs=base_model.input, outputs=base_model.get_layer('block4_pool').output)
+
+# Dictionary to store feature vectors for each image
+features_dict = {}
+
+# Loop through all images and extract features
+for img_path in image_files:
+    # Load and preprocess image
+    img = image.load_img(img_path, target_size=(224, 224))
+    x = image.img_to_array(img)
+    x = np.expand_dims(x, axis=0)
+    x = preprocess_input(x)
+
+    # Extract features from 'block4_pool'
+    features = model.predict(x)
+    flat_features = features.flatten()
+
+    # Store the flattened features with the image filename
+    filename = os.path.basename(img_path)
+    features_dict[filename] = flat_features
+
+    print(f"Processed: {filename}, Feature shape: {flat_features.shape}")
+
+################
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+# Step 1: Make sure your features are in a consistent flattened form
+# This flattens each feature array into a 1D vector
+all_feature_vectors = []
+labels = []
+
+for key, feature in features_dict.items():
+    flattened = feature.flatten()  # flatten to 1D
+    all_feature_vectors.append(flattened)
+    labels.append(key)
+
+# Step 2: Stack into a 2D array (shape: [16, N])
+all_feature_vectors = np.stack(all_feature_vectors)
+
+# Step 3: Compute cosine similarity matrix
+similarity_matrix = cosine_similarity(all_feature_vectors)
+
+VGG19 = np.array(1-similarity_matrix)
+
+#Plot RDM with title, axes titles, and colorbar TC_SAY_resnext
+import matplotlib.pyplot as plt
+
+plt.imshow(VGG19)
+plt.colorbar()
+plt.title('Representational Dissimilarity Matrix')
+plt.ylabel('Images', fontsize=16)
+plt.xlabel('Compared Images', fontsize=16)
+
+#####################
+
+# turning the 16x16 RDM into a list of 120 values
+#rdm indices is a list of x and y values
+rdm_indices = np.triu_indices(16)
+cor_rdm = []
+for i in range(0,len(rdm_indices[0])):
+#pulls out x and y values, (index at 0)
+    x = rdm_indices[0][i]
+    y = rdm_indices[1][i]
+#skipping diagnol
+    if x==y:
+        continue
+ #appending values selected at x and y to RDM List
+    cor_rdm.append(VGG19[x,y])
+print(cor_rdm)
+len(cor_rdm)
+
+DataPath = '/content/drive/My Drive/Colab Notebooks/'
+fname='Results_diss_babies_pooled_decode_within_SVM_02.28.2024_16.29.56.mat'
+data = loadmat(DataPath+fname)['results'][0,0]
+DA = data['DA']
+times=data['times']
+epoch=len(times[0])
+np.shape(DA)
+
+#generating a 120 value list for an RDM for each participant and time point
+time_start = 0
+time_end = epoch
+accMeans = []
+#for each partic. for each time point, you are taking each value of 16'16 matrix (upper triangle) to generate a 120 len list)
+for part in range(0,np.shape(DA)[0]):
+#     if part+1 in subs_remove:
+#         continue
+    accTimesD = []
+    for point in range(time_start,time_end):
+        rdm_neural=[]
+#selecting pairs of coordinates of upper triangle to get values we want
+        for i in range(0,136):
+            r = rdm_indices[0][i]
+            c = rdm_indices[1][i]
+            #skipping diagnol
+            if r==c:
+                continue
+            rdm_neural.append(DA[part,point,r,c])
+        #adding rdm to list all time points for one partic.
+        accTimesD.append(rdm_neural)
+    #adding partic level list to list of all partic data, (leaving u with 34, 550,120)
+    accMeans.append(accTimesD)
+#reshaping to make it the correct order
+bb = np.shape(DA)[0]
+#bb = 5
+accMeans=np.array(accMeans).reshape(bb,epoch,120)
+np.shape(accMeans)
+
+#giving us the list of correlations, the behavioral rdm and neural rdm at each timepoint
+rvalues = []
+for partic in accMeans:
+    participant = []
+    for timepoint in partic:
+        #getting each r and p value for all the correlations
+        rho, p = spearmanr(timepoint, cor_rdm)
+        participant.append(rho)
+        #adding each indiv. partic correlation to a big list with all partic.
+    rvalues.append(participant)
+np.shape(rvalues)
+
+rvalues_dict2["VGG19"] = rvalues
+
+#making a list of zeros to compare R values to
+b=np.full([np.shape(DA)[0],epoch],0)
+#running the permutation cluster test
+T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.array(rvalues),b], tail=1, out_type="mask")
+
+#creating list of overall average of r values for all participants
+avg_r = np.mean(rvalues,0)
+np.shape(rvalues)
+
+#Plotting all the correlations
+#times=range(0,epoch)
+#plt.figure(figsize=(20,10))
+#for i in range(0,bb):
+#    plt.plot(range(time_start-100,time_end-100),rvalues[i],color="teal")
+#plt.plot(range(time_start-100,time_end-100),avg_r, linewidth=5,color="purple", label="")
+#plt.subplot
+#for i_c, c in enumerate(clusters):
+#    c = c[0]
+#    if cluster_p_values[i_c] <= 0.05:
+#        h = plt.axvspan(times[c.start]-100, times[c.stop - 1]-100,
+#                         color='pink', alpha=0.5,ymin=0.10,ymax=0.12)
+#plt.ylabel('Spearman r',fontsize=30)
+#plt.xlabel('Time (ms)',fontsize=30)
+#plt.xticks(fontsize=20)
+#plt.yticks(fontsize=20)
+#plt.hlines(0, -100, 1000)
+#plt.xlim(-100,1000)
+#plt.show()
+#############################################################
+# Compute standard error of the mean (SEM) for 95% CI
+sem_r = sem(rvalues, axis=0)
+ci_upper = avg_r + 1.96 * sem_r  # Upper bound
+ci_lower = avg_r - 1.96 * sem_r  # Lower bound
+
+# Plotting all correlations
+times = range(0, epoch)
+plt.figure(figsize=(20, 10))
+
+# Plot individual participant correlations
+for i in range(0,bb):
+    plt.plot(range(time_start-100, time_end-100), rvalues[i], color="teal", alpha=0.6)
+
+# Plot average correlation with 95% CI shading
+plt.plot(range(time_start-100, time_end-100), avg_r, linewidth=5, color="purple", label="Average Correlation")
+plt.fill_between(range(time_start-100, time_end-100), ci_lower, ci_upper, color="purple", alpha=0.2, label="95% CI")
+
+# Highlight significant clusters
+plt.subplot
+for i_c, c in enumerate(clusters):
+    c = c[0]
+    if cluster_p_values[i_c] <= 0.05:
+        plt.axvspan(times[c.start]-100, times[c.stop - 1]-100, color='pink', alpha=0.5, ymin=0.10, ymax=0.12)
+
+# Formatting
+plt.ylabel('Spearman r', fontsize=30)
+plt.xlabel('Time (ms)', fontsize=30)
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+plt.hlines(0, -100, 1000, color='black', linestyle='dashed')
+plt.xlim(-100, 1000)
+plt.legend(fontsize=20)
+plt.show()
+
+#####################################
+# Add first set of results (e.g., Condition 1)
+saved_avg_r_data["avg_r_condition_VGG19"] = avg_r
+saved_avg_r_data["ci_lower_condition_VGG19"] = ci_lower
+saved_avg_r_data["ci_upper_condition_VGG19"] = ci_upper
+# Extract significant cluster time ranges and store them in saved_avg_r_data
+saved_avg_r_data["significant_clusters_VGG19"] = [
+    (times[c[0].start] - 100, times[c[0].stop - 1] - 100)  # Extract start and stop times
+    for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
+] # Store significant clusters
+saved_avg_r_data["cluster_p_values_VGG19"] = cluster_p_values  # Store corresponding p-values
+
+#################
+# Extract significant time bands from pink bars
+significant_time_bands = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+        significant_time_bands.append((start_time, stop_time))
+
+# Print the extracted time bands
+print("Significant Time Bands (ms):")
+for band in significant_time_bands:
+    print(f"Start: {band[0]} ms, Stop: {band[1]} ms")
+
+##################################################
+# Extract significant time bands, peak r-values, and p-values
+significant_clusters_info = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+
+        # Get r-values for this time window
+        r_values_in_cluster = avg_r[c.start:c.stop]
+
+        # Find the peak r-value and its corresponding time
+        peak_r_value = np.max(r_values_in_cluster)  # Highest correlation value
+        peak_r_time = times[np.argmax(r_values_in_cluster) + c.start] - 100  # Convert to correct time
+
+        # Store cluster info
+        significant_clusters_info.append({
+            "start_time": start_time,
+            "stop_time": stop_time,
+            "peak_r_value": peak_r_value,
+            "peak_r_time": peak_r_time,
+            "p_value": cluster_p_values[i_c]
+        })
+
+# Print extracted cluster information
+print("Significant Clusters Information:")
+for cluster in significant_clusters_info:
+    print(f"Time Band: {cluster['start_time']} ms to {cluster['stop_time']} ms")
+    print(f"  - Peak r-value: {cluster['peak_r_value']} at {cluster['peak_r_time']} ms")
+    print(f"  - Cluster p-value: {cluster['p_value']}")
+    print("-" * 50)
