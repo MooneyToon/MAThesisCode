@@ -382,3 +382,25 @@ saved_avg_r_data["significant_clusters_VoneCornetS"] = [
     for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
 ] # Store significant clusters
 saved_avg_r_data["cluster_p_values_VoneCornetS"] = cluster_p_values  # Store corresponding p-values
+
+#########################################################################
+# Code to save and load variable containing VOneResnet50 model RDM
+import pickle
+
+# 1. Mount Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# 2. Define path where you want to save the file
+save_path = '/content/drive/My Drive/Colab Notebooks/VOneResnet50.pkl'
+
+# 3. Save the variable
+with open(save_path, 'wb') as f:
+    pickle.dump(VOneResnet50, f)
+
+print("Saved successfully!")
+##################################
+# To load the variable back into a new session
+with open(save_path, 'rb') as f:
+    VOneResnet50 = pickle.load(f)
+
