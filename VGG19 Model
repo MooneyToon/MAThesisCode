@@ -152,7 +152,10 @@ for partic in accMeans:
     rvalues.append(participant)
 np.shape(rvalues)
 
+###################################################
+#Make sure variable rvalues_dict2 has been created
 rvalues_dict2["VGG19"] = rvalues
+###################################################
 
 #making a list of zeros to compare R values to
 b=np.full([np.shape(DA)[0],epoch],0)
@@ -218,7 +221,8 @@ plt.legend(fontsize=20)
 plt.show()
 
 #####################################
-# Add first set of results (e.g., Condition 1)
+# Make sure variable 'saved_avg_r_data' has been created
+# Add first set of results (e.g., Condition VGG19)
 saved_avg_r_data["avg_r_condition_VGG19"] = avg_r
 saved_avg_r_data["ci_lower_condition_VGG19"] = ci_lower
 saved_avg_r_data["ci_upper_condition_VGG19"] = ci_upper
@@ -278,3 +282,24 @@ for cluster in significant_clusters_info:
     print(f"  - Peak r-value: {cluster['peak_r_value']} at {cluster['peak_r_time']} ms")
     print(f"  - Cluster p-value: {cluster['p_value']}")
     print("-" * 50)
+
+######################################################
+# Code to save and load variable containing VGG19 model RDM
+import pickle
+
+# 1. Mount Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# 2. Define path where you want to save the file
+save_path = '/content/drive/My Drive/Colab Notebooks/VGG19.pkl'
+
+# 3. Save the variable
+with open(save_path, 'wb') as f:
+    pickle.dump(VGG19, f)
+
+print("Saved successfully!")
+##################################
+# To load the variable back into a new session
+with open(save_path, 'rb') as f:
+    VGG19 = pickle.load(f)
