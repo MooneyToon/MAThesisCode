@@ -199,6 +199,12 @@ for partic in accMeans:
     rvalues.append(participant)
 np.shape(rvalues)
 
+#################################
+# Initialize the dictionary before assigning to it
+rvalues_dict2 = {}
+rvalues_dict2["TCSAY"] = rvalues
+#################################
+
 #making a list of zeros to compare R values to
 b=np.full([np.shape(DA)[0],epoch],0)
 #running the permutation cluster test
