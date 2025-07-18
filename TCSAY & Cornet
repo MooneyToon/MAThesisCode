@@ -367,6 +367,8 @@ T_obs, clusters, cluster_p_values, H0 = mstats.permutation_cluster_test([np.arra
 #creating list of overall average of r values for all partipants
 avg_r = np.mean(rvalues,0)
 np.shape(rvalues)
+
+rvalues_dict2["cornet"] = rvalues
 ###############################################
 # COMMENTED OUT TO SELECT PLOT WITH 95% CI INTERVAL INSTEAD
 #Plotting all the correlations
