@@ -1,6 +1,7 @@
 # Code to run analysis for all models and compare to VGG19 baseline
 
 # VGG19 Model
+print("Begin VGG19 Model Analyses")
 
 !pip install mne
 from scipy.stats import sem, spearmanr
@@ -290,7 +291,11 @@ for cluster in significant_clusters_info:
     print(f"  - Peak r-value: {cluster['peak_r_value']} at {cluster['peak_r_time']} ms")
     print(f"  - Cluster p-value: {cluster['p_value']}")
     print("-" * 50)
+
+print("End VGG19 Model Analyses")
 ###################################################################
+print("Begin TC_SAY_resnext Model Analyses")
+
 #Complete code (for one layer)
 !pip install datasets
 !pip install torchvision
@@ -568,7 +573,59 @@ saved_avg_r_data["significant_clusters_TCSAY"] = [
 ] # Store significant clusters
 saved_avg_r_data["cluster_p_values_TCSAY"] = cluster_p_values  # Store corresponding p-values
 
+####################################################################
+# Extract significant time bands from pink bars
+significant_time_bands = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+        significant_time_bands.append((start_time, stop_time))
+
+# Print the extracted time bands
+print("Significant Time Bands (ms):")
+for band in significant_time_bands:
+    print(f"Start: {band[0]} ms, Stop: {band[1]} ms")
+
+##################################################
+# Extract significant time bands, peak r-values, and p-values
+significant_clusters_info = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+
+        # Get r-values for this time window
+        r_values_in_cluster = avg_r[c.start:c.stop]
+
+        # Find the peak r-value and its corresponding time
+        peak_r_value = np.max(r_values_in_cluster)  # Highest correlation value
+        peak_r_time = times[np.argmax(r_values_in_cluster) + c.start] - 100  # Convert to correct time
+
+        # Store cluster info
+        significant_clusters_info.append({
+            "start_time": start_time,
+            "stop_time": stop_time,
+            "peak_r_value": peak_r_value,
+            "peak_r_time": peak_r_time,
+            "p_value": cluster_p_values[i_c]
+        })
+
+# Print extracted cluster information
+print("Significant Clusters Information:")
+for cluster in significant_clusters_info:
+    print(f"Time Band: {cluster['start_time']} ms to {cluster['stop_time']} ms")
+    print(f"  - Peak r-value: {cluster['peak_r_value']} at {cluster['peak_r_time']} ms")
+    print(f"  - Cluster p-value: {cluster['p_value']}")
+    print("-" * 50)
+
+print("End TC_SAY_resnext Model Analyses")
 #############################################################
+print("Begin CORnet-S Model Analyses")
 
 filename = '/content/drive/My Drive/Colab Notebooks/CORnet-S_IT_output_feats (1).npy'
 dataset_cor = np.load(filename, encoding='bytes')
@@ -697,8 +754,61 @@ saved_avg_r_data["significant_clusters_cornet"] = [
     for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
 ] # Store significant clusters
 saved_avg_r_data["cluster_p_values_cornet"] = cluster_p_values  # Store corresponding p-values
+
+##################################################################
+# Extract significant time bands from pink bars
+significant_time_bands = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+        significant_time_bands.append((start_time, stop_time))
+
+# Print the extracted time bands
+print("Significant Time Bands (ms):")
+for band in significant_time_bands:
+    print(f"Start: {band[0]} ms, Stop: {band[1]} ms")
+
+##################################################
+# Extract significant time bands, peak r-values, and p-values
+significant_clusters_info = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+
+        # Get r-values for this time window
+        r_values_in_cluster = avg_r[c.start:c.stop]
+
+        # Find the peak r-value and its corresponding time
+        peak_r_value = np.max(r_values_in_cluster)  # Highest correlation value
+        peak_r_time = times[np.argmax(r_values_in_cluster) + c.start] - 100  # Convert to correct time
+
+        # Store cluster info
+        significant_clusters_info.append({
+            "start_time": start_time,
+            "stop_time": stop_time,
+            "peak_r_value": peak_r_value,
+            "peak_r_time": peak_r_time,
+            "p_value": cluster_p_values[i_c]
+        })
+
+# Print extracted cluster information
+print("Significant Clusters Information:")
+for cluster in significant_clusters_info:
+    print(f"Time Band: {cluster['start_time']} ms to {cluster['stop_time']} ms")
+    print(f"  - Peak r-value: {cluster['peak_r_value']} at {cluster['peak_r_time']} ms")
+    print(f"  - Cluster p-value: {cluster['p_value']}")
+    print("-" * 50)
+
+print("End CORnet-S Model Analyses")
 ################################################################################
 # THIS SEEMS TO SUCCESSFULLY LOAD PRE-TRAINED CVCL !!!!! (part 1 of 2)
+print("Begin CVCL Model Analyses")
 
 # Mount Google Drive (optional, if you need to access files from Drive)
 from google.colab import drive
@@ -996,8 +1106,61 @@ saved_avg_r_data["significant_clusters_CVCL"] = [
     for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
 ] # Store significant clusters
 saved_avg_r_data["cluster_p_values_CVCL"] = cluster_p_values  # Store corresponding p-values
+
+###############################################################
+# Extract significant time bands from pink bars
+significant_time_bands = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+        significant_time_bands.append((start_time, stop_time))
+
+# Print the extracted time bands
+print("Significant Time Bands (ms):")
+for band in significant_time_bands:
+    print(f"Start: {band[0]} ms, Stop: {band[1]} ms")
+
+##################################################
+# Extract significant time bands, peak r-values, and p-values
+significant_clusters_info = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+
+        # Get r-values for this time window
+        r_values_in_cluster = avg_r[c.start:c.stop]
+
+        # Find the peak r-value and its corresponding time
+        peak_r_value = np.max(r_values_in_cluster)  # Highest correlation value
+        peak_r_time = times[np.argmax(r_values_in_cluster) + c.start] - 100  # Convert to correct time
+
+        # Store cluster info
+        significant_clusters_info.append({
+            "start_time": start_time,
+            "stop_time": stop_time,
+            "peak_r_value": peak_r_value,
+            "peak_r_time": peak_r_time,
+            "p_value": cluster_p_values[i_c]
+        })
+
+# Print extracted cluster information
+print("Significant Clusters Information:")
+for cluster in significant_clusters_info:
+    print(f"Time Band: {cluster['start_time']} ms to {cluster['stop_time']} ms")
+    print(f"  - Peak r-value: {cluster['peak_r_value']} at {cluster['peak_r_time']} ms")
+    print(f"  - Cluster p-value: {cluster['p_value']}")
+    print("-" * 50)
+
+print("End CVCL Model Analyses")
 ################################################################################
 # Only load VoneCornet-S
+print("Begin VoneCornet-S Model Analyses")
 
 #Setup with VoneNet architecture - seems to be successful
 
@@ -1381,8 +1544,61 @@ saved_avg_r_data["significant_clusters_VoneCornetS"] = [
     for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
 ] # Store significant clusters
 saved_avg_r_data["cluster_p_values_VoneCornetS"] = cluster_p_values  # Store corresponding p-values
+
+#############################################################
+# Extract significant time bands from pink bars
+significant_time_bands = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+        significant_time_bands.append((start_time, stop_time))
+
+# Print the extracted time bands
+print("Significant Time Bands (ms):")
+for band in significant_time_bands:
+    print(f"Start: {band[0]} ms, Stop: {band[1]} ms")
+
+##################################################
+# Extract significant time bands, peak r-values, and p-values
+significant_clusters_info = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+
+        # Get r-values for this time window
+        r_values_in_cluster = avg_r[c.start:c.stop]
+
+        # Find the peak r-value and its corresponding time
+        peak_r_value = np.max(r_values_in_cluster)  # Highest correlation value
+        peak_r_time = times[np.argmax(r_values_in_cluster) + c.start] - 100  # Convert to correct time
+
+        # Store cluster info
+        significant_clusters_info.append({
+            "start_time": start_time,
+            "stop_time": stop_time,
+            "peak_r_value": peak_r_value,
+            "peak_r_time": peak_r_time,
+            "p_value": cluster_p_values[i_c]
+        })
+
+# Print extracted cluster information
+print("Significant Clusters Information:")
+for cluster in significant_clusters_info:
+    print(f"Time Band: {cluster['start_time']} ms to {cluster['stop_time']} ms")
+    print(f"  - Peak r-value: {cluster['peak_r_value']} at {cluster['peak_r_time']} ms")
+    print(f"  - Cluster p-value: {cluster['p_value']}")
+    print("-" * 50)
+
+print("End VoneCornet-S Model Analyses")
 ################################################################################
 # Only load VOneResnet50
+print("Begin VOneResnet50 Model Analyses")
 
 #Setup with VoneNet architecture - seems to be successful
 
@@ -1770,8 +1986,61 @@ saved_avg_r_data["significant_clusters_VOneResnet50"] = [
     for i_c, c in enumerate(clusters) if cluster_p_values[i_c] <= 0.05
 ] # Store significant clusters
 saved_avg_r_data["cluster_p_values_VOneResnet50"] = cluster_p_values  # Store corresponding p-values
+
+################################################################
+# Extract significant time bands from pink bars
+significant_time_bands = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+        significant_time_bands.append((start_time, stop_time))
+
+# Print the extracted time bands
+print("Significant Time Bands (ms):")
+for band in significant_time_bands:
+    print(f"Start: {band[0]} ms, Stop: {band[1]} ms")
+
+##################################################
+# Extract significant time bands, peak r-values, and p-values
+significant_clusters_info = []
+
+for i_c, c in enumerate(clusters):
+    c = c[0]  # Extract the cluster mask
+    if cluster_p_values[i_c] <= 0.05:  # Check if the cluster is significant
+        start_time = times[c.start] - 100  # Convert to time (adjusted for -100 shift)
+        stop_time = times[c.stop - 1] - 100
+
+        # Get r-values for this time window
+        r_values_in_cluster = avg_r[c.start:c.stop]
+
+        # Find the peak r-value and its corresponding time
+        peak_r_value = np.max(r_values_in_cluster)  # Highest correlation value
+        peak_r_time = times[np.argmax(r_values_in_cluster) + c.start] - 100  # Convert to correct time
+
+        # Store cluster info
+        significant_clusters_info.append({
+            "start_time": start_time,
+            "stop_time": stop_time,
+            "peak_r_value": peak_r_value,
+            "peak_r_time": peak_r_time,
+            "p_value": cluster_p_values[i_c]
+        })
+
+# Print extracted cluster information
+print("Significant Clusters Information:")
+for cluster in significant_clusters_info:
+    print(f"Time Band: {cluster['start_time']} ms to {cluster['stop_time']} ms")
+    print(f"  - Peak r-value: {cluster['peak_r_value']} at {cluster['peak_r_time']} ms")
+    print(f"  - Cluster p-value: {cluster['p_value']}")
+    print("-" * 50)
+
+print("End VOneResnet50 Model Analyses")
 ################################################################################
 # Final Plot
+print("Plot correlation of Model outputs to infant neural representations")
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1837,6 +2106,7 @@ plt.tight_layout()
 plt.show()
 ################################################################################
 #Comparing VGG to other models
+print("Comparing VGG19 to other tested models")
 from mne.stats import permutation_cluster_test
 import numpy as np
 import matplotlib.pyplot as plt
@@ -1907,3 +2177,4 @@ for model in compare_models:
     plt.legend()
     plt.tight_layout()
     plt.show()
+
