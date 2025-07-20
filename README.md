@@ -1,5 +1,6 @@
 # MAThesisCode
 Full code used in the analysis for MA Thesis: Comparing infant-aligned artificial neural networks’ (ANNs) categorization of objects to actual infant EEG.
+
 All code was written to run in Google Colab using runtime type ‘Python 3’ and the hardware accelerator ‘T4 GPU’.
 
 —Full code for single layer model analyses takes ~35 minutes to run—
